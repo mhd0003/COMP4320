@@ -18,21 +18,23 @@ public class ClientUDP {
       int i = 5;
       DatagramSocket clientSocket = new DatagramSocket();
       
-      if(args.length != 4)
+      if(args.length != 5)
       {
-         System.out.println("Usage: ClientUDP hostname op message");
+         System.out.println("Usage: ClientUDP hostname requestID op message ");
       }
       
       addr = InetAddress.getByName(args[1]);
     
-      if (args[3].length() < 1024) 
-         str = args[3];
+      if (args[4].length() < 1024) 
+         str = args[4];
       else 
-         str = args[3].substring(0, 1024); 
-              
-      op = Byte.parseByte(args[2]);
+         str = args[4].substring(0, 1024); 
+      id = (short) args[2];
+      op = Byte.parseByte(args[3]);
+      
       length = (short)str.length();
       length += 5;
+      
       sendData = new byte[length];
       sendData[0] = (byte)((length >> 8) & 0xff);
       sendData[1] = (byte)(length);
