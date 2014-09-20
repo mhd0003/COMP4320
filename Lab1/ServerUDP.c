@@ -13,21 +13,42 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#define MYPORT "10038"	// the port users will be connecting to
 
-#define MAXBUFLEN 1030
+#define MAXBUFLEN 1029
 
-struct packet {
+struct rPacket {
 uint16_t length;
 uint16_t id;
 uint8_t op;
 char* str;
 };
 
-typedef packet packet_t;
+typedef rPacket rPacket_t;
+
+struct nvPacket {
+   uint16_t length;
+   uint16_t id;
+   uint16_t numVowel;
+};
+
+typedef nvPacket nvPacket_t;
+
+struct dvPacket {
+   uint16_t length;
+   uint16_t id;
+   char* dv;
+};
+
+typedef dvPacket dvPacket_t;
 
 uint16_t vLength(char* str) {
-	return (uint16_t) sizeOf(str);
+	int i,numVowel = 0;
+   
+   for(i; i < sizeOf(str); i++) {
+    if(check_vowel(str[i]) == 1) {       //is a vowel
+      numVowel++;
+    }
+  }
 }
 
 char* disemvowel(char* str){
@@ -74,7 +95,7 @@ void *get_in_addr(struct sockaddr *sa)
 	return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-int main(void)
+int main(int argc, char *argv)
 {
 	int sockfd;
 	struct addrinfo hints, *servinfo, *p;
@@ -84,14 +105,21 @@ int main(void)
 	char buf[MAXBUFLEN];
 	socklen_t addr_len;
 	char their_addr_str[INET6_ADDRSTRLEN];
-	packet_t test;	
-
+	rPacket_t receiveData;	
+   int myPort;
+   char* sendData = NULL;
+   
+   if (argc != 2)
+      exit(1);
+   else
+      myPort = (int)argv[1];
+   
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC; // set to AF_INET to force IPv4
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = AI_PASSIVE; // use my IP
 
-	if ((rv = getaddrinfo(NULL, MYPORT, &hints, &servinfo)) != 0) {
+	if ((rv = getaddrinfo(NULL, myPort, &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
 	}
@@ -135,32 +163,40 @@ int main(void)
 				get_in_addr((struct sockaddr *)&their_addr),
 				their_addr_str, sizeof their_addr_str));
 
-		test.length = buf[0];
-		test.length = test.length << 8;
-		test.length = test.length | buf[1];
-		test.id = buf[2];
-		test.id = test.id << 8;
-		test.id = test.id | buf[3];
-		test.op = buf[4];
+		receiveData.length = buf[0];
+		receiveData.length = test.length << 8;
+		receiveData.length = test.length | buf[1];
+		receiveData.id = buf[2];
+		receiveData.id = test.id << 8;
+		receiveData.id = test.id | buf[3];
+		receiveData.op = buf[4];
 		int j = 0;
 		for (int i = 5; i <sizeOf(buf); i++) {
-			test.str[j] = buf[i]; 
+			receiveData.str[j] = buf[i]; 
 		}
 		
-		if (test.op == 0x55){
-			uint16_t size = vLength(test.str);
-		if (test.op == 0xAA) {
-			test.str = disemvowel(test.str);
-
-		if ((numbytesSent = sendto(sockfd, buf, numbytesRecv, 0, 					(struct sockaddr *)&their_addr, addr_len))==-1) {
+		if (receiveData.op == 0x55){
+         nvPacket_t sendPacket;
+         sendPacket.length = receiveData.length
+         sendPacket.id = receiveData.id;
+			sendPacket.numVowel = vLength(receiveData.str);
+      }
+      
+		if (receiveData.op == 0xAA) {
+			dvPacket_t sendPacket;
+         sendPacket.length = receiveData.length
+         sendPacket.id = receiveData.id;
+			sendPacket.dv = disemvowel(receiveData.str);
+      }
+      
+      sendData = (char)sendPacket;
+      
+		if ((numbytesSent = sendto(sockfd, sendData, sizeOf sendData, 0, 
+      	   (struct sockaddr *)&their_addr, addr_len))==-1) {
 			perror("serverUDP: sendto");
 			exit(1);
 		}
 
-
-		printf("listener: packet is %d bytes long\n", numbytesRecv);
-		buf[numbytesRecv] = '\0';
-		printf("listener: packet contains \"%s\"\n", buf);
 
 
 	}
