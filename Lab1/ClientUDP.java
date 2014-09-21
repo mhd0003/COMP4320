@@ -4,6 +4,29 @@ import java.net.InetAddress;
 import java.util.Arrays;
 
 public class ClientUDP {
+
+   public static void putLength(byte[] data, short length) {
+      data[0] = (byte) (length >> 8);
+      data[1] = (byte) (length & 0x00ff);
+   }
+
+   public static void putID(byte[] data, short id) {
+      data[0] = (byte) (id >> 8);
+      data[1] = (byte) (id & 0x00ff);
+   }
+
+   public static short getLength(byte[] data) {
+      return (short) ( (data[0] << 8) | (data[1]));
+   }
+
+   public static short getID(byte[] data) {
+      return (short) ( (data[2] << 8) | (data[3]));
+   }
+
+   public static String getMessage(byte[] data) {
+      return new String(Arrays.copyOfRange(data, 5, getLength(data)));
+   }
+
    public static void main(String args[]) throws Exception {
 
       int portNum = 10038;
@@ -20,47 +43,58 @@ public class ClientUDP {
 
       if(args.length != 5)
       {
-         System.out.println("Usage: ClientUDP hostname requestID op message ");
+         System.out.println("Usage: ClientUDP hostname requestID op message");
       }
 
+      // hostname
       addr = InetAddress.getByName(args[1]);
 
+      // first 1024 chars of message
       if (args[4].length() < 1024)
          str = args[4];
       else
          str = args[4].substring(0, 1024);
-      id = (short) args[2];
+
+      // requestID and op
+      id = Short.parseShort(args[2]);
       op = Byte.parseByte(args[3]);
 
-      length = (short)str.length();
+      // 1 byte for each char in message + 5 bytes for hostname,
+      // requestID and op
+      length = (short) str.length();
       length += 5;
 
       sendData = new byte[length];
-      sendData[0] = (byte)((length >> 8) & 0xff);
-      sendData[1] = (byte)(length);
-      sendData[2] = (byte)((id >> 8) & 0xff);
-      sendData[3] = (byte)(id & 0xff);
+
+      // Assuming big endian here
+      putLength(sendData, length);
+      putID(sendData, id);
       sendData[4] = op;
 
-      for (char ch: str.toCharArray()){
-
-         sendData[i] = (byte)ch;
+      for (char ch : str.toCharArray()){
+         sendData[i++] = (byte) ch;
          i++;
       }
 
-      sendPacket = new DatagramPacket(sendData, (int)length, addr, portNum);
-      clientSocket.send(sendPacket);
+      sendPacket = new DatagramPacket(sendData, (int) length, addr, portNum);
       DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+      long startTime = System.currentTimeMillis();
+
+      clientSocket.send(sendPacket);
       clientSocket.receive(receivePacket);
 
-      if (op == 0x55){
+      System.out.println("Time taken: " + (System.currentTimeMillis() - startTime) + " ms");
+      System.out.println("Request ID: " + getID(receiveData));
+      System.out.println("Response: " + getMessage(receiveData));
+
+      /* I think this should be for the server:
+      if (op == 0xAA) {
          int numVowel = receiveData[4];
          numVowel = numVowel << 8;
          numVowel = numVowel | receiveData[5];
 
          System.out.println(str + " contains " + numVowel + "vowels.");
-      }
-      else if (op == 0xAA) {
+      } else if (op == 0x55) {
          String dv = "";
          for(i = 4; i < receiveData.length; i++)
          {
@@ -68,5 +102,6 @@ public class ClientUDP {
          }
          System.out.println(str + " converts to " + dv);
       }
+      */
    }
 }
