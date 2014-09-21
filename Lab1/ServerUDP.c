@@ -170,6 +170,7 @@ int main(int argc, char* argv[])
             get_in_addr((struct sockaddr *)&their_addr),
             their_addr_str, sizeof their_addr_str));
 
+
       request.length = (buf[0] << 8) | buf[1];
       request.id = (buf[2] << 8) | buf[3];
       request.op = buf[4];
