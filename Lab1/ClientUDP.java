@@ -11,8 +11,8 @@ public class ClientUDP {
    }
 
    public static void putID(byte[] data, short id) {
-      data[0] = (byte) (id >> 8);
-      data[1] = (byte) (id & 0x00ff);
+      data[2] = (byte) (id >> 8);
+      data[3] = (byte) (id & 0x00ff);
    }
 
    public static short getLength(byte[] data) {
@@ -24,7 +24,7 @@ public class ClientUDP {
    }
 
    public static String getMessage(byte[] data) {
-      return new String(Arrays.copyOfRange(data, 5, getLength(data)));
+      return new String(Arrays.copyOfRange(data, 4, getLength(data)));
    }
 
    public static void main(String args[]) throws Exception {
@@ -41,29 +41,28 @@ public class ClientUDP {
       int i = 5;
       DatagramSocket clientSocket = new DatagramSocket();
 
-      if(args.length != 5)
+      if(args.length != 4)
       {
-         System.out.println("Usage: ClientUDP hostname requestID op message");
+         System.out.println("Usage: hostname requestID op message");
       }
 
       // hostname
-      addr = InetAddress.getByName(args[1]);
+      addr = InetAddress.getByName(args[0]);
 
       // first 1024 chars of message
-      if (args[4].length() < 1024)
-         str = args[4];
+      if (args[3].length() < 1024)
+         str = args[3];
       else
-         str = args[4].substring(0, 1024);
+         str = args[3].substring(0, 1024);
 
       // requestID and op
-      id = Short.parseShort(args[2]);
-      op = Byte.parseByte(args[3]);
+      id = Short.parseShort(args[1]);
+      op = (byte) Integer.parseInt(args[2]);
 
       // 1 byte for each char in message + 5 bytes for hostname,
       // requestID and op
       length = (short) str.length();
       length += 5;
-
       sendData = new byte[length];
 
       // Assuming big endian here
@@ -73,7 +72,6 @@ public class ClientUDP {
 
       for (char ch : str.toCharArray()){
          sendData[i++] = (byte) ch;
-         i++;
       }
 
       sendPacket = new DatagramPacket(sendData, (int) length, addr, portNum);

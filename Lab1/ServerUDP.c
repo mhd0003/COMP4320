@@ -15,25 +15,6 @@
 
 #define MAXBUFLEN 1029
 
-typedef struct rPacket {
-   uint16_t length;
-   uint16_t id;
-   uint8_t op;
-   char* str;
-} rPacket_t;
-
-typedef struct nvPacket {
-   uint16_t length;
-   uint16_t id;
-   uint16_t numVowel;
-} nvPacket_t;
-
-typedef struct dvPacket {
-   uint16_t length;
-   uint16_t id;
-   char* dv;
-} dvPacket_t;
-
 typedef struct request {
    uint16_t length;
    uint16_t id;
@@ -44,8 +25,27 @@ typedef struct request {
 typedef struct response {
    uint16_t length;
    uint16_t id;
-   char* message;
+   char message[MAXBUFLEN];
 } response_t;
+
+// From Dr. Biaz's code
+void displayBuffer(char *Buffer, int length){
+   int currentByte, column;
+
+   currentByte = 0;
+   printf("\n>>>>>>>>>>>> Content in hexadecimal <<<<<<<<<<<\n");
+   while (currentByte < length){
+      printf("%3d: ", currentByte);
+      column =0;
+      while ((currentByte < length) && (column < 10)){
+         printf("%2x ",Buffer[currentByte]);
+         column++;
+         currentByte++;
+      }
+      printf("\n");
+   }
+   printf("\n\n");
+}
 
 int isVowel(char c)
 {
@@ -90,6 +90,7 @@ void disemvowel(char* source, char* dest, int len) {
 
       // if (str[i] == '\0') break;
    }
+   dest[j] = '\0';
 }
 
 // get sockaddr, IPv4 or IPv6:
@@ -112,12 +113,8 @@ int main(int argc, char* argv[])
    char buf[MAXBUFLEN];
    socklen_t addr_len;
    char their_addr_str[INET6_ADDRSTRLEN];
-   rPacket_t receiveData;
    response_t response;
    request_t request;
-   // int myPort;
-   char* sendData = NULL;
-   char message[MAXBUFLEN];
 
    if (argc != 2)
       exit(1);
@@ -173,44 +170,28 @@ int main(int argc, char* argv[])
             get_in_addr((struct sockaddr *)&their_addr),
             their_addr_str, sizeof their_addr_str));
 
-     //  receiveData.length = (buf[0] << 8) | buf[1];
-     //  receiveData.id = (buf[2] << 8) | buf[3];
-     //  receiveData.op = buf[4];
-
-     //  int j = 0;
-     //  for (int i = 5; i < sizeof(buf); i++) {
-     //     receiveData.str[j++] = buf[i];
-     //  }
-
-     //  if (receiveData.op == 0x55){
-     //     nvPacket_t sendPacket;
-     //     sendPacket.length = receiveData.length;
-     //     sendPacket.id = receiveData.id;
-     //     sendPacket.numVowel = numVowels(receiveData.str);
-     // }
-
-     //  if (receiveData.op == 0xAA) {
-     //     dvPacket_t sendPacket;
-     //     sendPacket.length = receiveData.length;
-     //     sendPacket.id = receiveData.id;
-     //     sendPacket.dv = disemvowel(receiveData.str);
-     //  }
-
       request.length = (buf[0] << 8) | buf[1];
       request.id = (buf[2] << 8) | buf[3];
       request.op = buf[4];
+      // printf("length is: %d, id is: %d, op is: %d", request.length, request.id, request.op);
+      // printf(", message is: ");
+      // for (count = 5; count < numbytesRecv; count++) {
+      //    printf("%c", buf[count]);
+      // }
+      // printf("\n");
+      // displayBuffer((char*) &request, request.length);
 
       if (request.op == 0x55) {
-         sprintf(message, "%d vowels", numVowels(&buf[5], request.length-5));
+         sprintf(response.message, "%d vowels", numVowels(&buf[5], request.length-5));
       } else if (request.op = 0xAA) {
-         disemvowel(&buf[5], message, request.length-5);
+         disemvowel(&buf[5], response.message, request.length-5);
       }
 
-      response.length = strlen(message+5);
+      response.length = strlen(response.message) + 5;
       response.id = request.id;
-      response.message = message;
-      // sendData = (char) sendPacket;
+      printf("message: %s", response.message);
 
+      // displayBuffer((char*) &response, response.length);
       if ((numbytesSent = sendto(sockfd, (char*) &response, response.length, 0,
          (struct sockaddr *)&their_addr, addr_len))==-1) {
          perror("serverUDP: sendto");
