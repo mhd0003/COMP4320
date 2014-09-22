@@ -4,6 +4,8 @@ import java.net.InetAddress;
 import java.util.Arrays;
 
 public class ClientUDP {
+   static final String COUNT_VOWELS = "85";
+   static final String DISEMVOWEL = "170";
 
    public static void putLength(byte[] data, short length) {
       data[0] = (byte) (length >> 8);
@@ -21,6 +23,10 @@ public class ClientUDP {
 
    public static short getID(byte[] data) {
       return (short) ( (data[2] << 8) | (data[3]));
+   }
+
+   public static short getVowels(byte[] data) {
+      return (short) ( (data[4] << 8) | (data[5]));
    }
 
    public static String getMessage(byte[] data) {
@@ -74,6 +80,7 @@ public class ClientUDP {
          sendData[i++] = (byte) ch;
       }
 
+      // System.out.println("Data: " + Arrays.toString(sendData));
       sendPacket = new DatagramPacket(sendData, (int) length, addr, portNum);
       DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
       long startTime = System.currentTimeMillis();
@@ -83,7 +90,11 @@ public class ClientUDP {
 
       System.out.println("Time taken: " + (System.currentTimeMillis() - startTime) + " ms");
       System.out.println("Request ID: " + getID(receiveData));
-      System.out.println("Response: " + getMessage(receiveData));
+      if (args[2].equals(COUNT_VOWELS)) {
+         System.out.println("Number of vowels: " + getVowels(receiveData));
+      } else if (args[2].equals(DISEMVOWEL)) {
+         System.out.println("Response: " + getMessage(receiveData));
+      }
 
       /* I think this should be for the server:
       if (op == 0xAA) {
