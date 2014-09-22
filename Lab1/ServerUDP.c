@@ -22,11 +22,17 @@ typedef struct request {
    char* message;
 } request_t;
 
-typedef struct response {
+typedef struct dvResponse {
    uint16_t length;
    uint16_t id;
    char message[MAXBUFLEN];
-} response_t;
+} dvResponse_t;
+
+typedef struct nvResponse {
+   uint16_t length;
+   uint16_t id;
+   uint16_t numV;
+} nvResponse_t;
 
 // From Dr. Biaz's code
 void displayBuffer(char *Buffer, int length){
@@ -113,8 +119,10 @@ int main(int argc, char* argv[])
    char buf[MAXBUFLEN];
    socklen_t addr_len;
    char their_addr_str[INET6_ADDRSTRLEN];
-   response_t response;
    request_t request;
+   dvResponse_t dvResponse;
+   nvResponse_t nvResponse;
+   char* response;
 
    if (argc != 2)
       exit(1);
@@ -180,20 +188,30 @@ int main(int argc, char* argv[])
       //    printf("%c", buf[count]);
       // }
       // printf("\n");
-      // displayBuffer((char*) &request, request.length);
+      displayBuffer((char*) &request, request.length);
 
       if (request.op == 0x55) {
-         sprintf(response.message, "%d vowels", numVowels(&buf[5], request.length-5));
+         printf("Counting vowels...\n");
+         nvResponse.length = 6;
+         nvResponse.id = request.id;
+         nvResponse.numV = numVowels(&buf[5], request.length-5);
+
+         response = (char*) &nvResponse;
+         numbytesSent = nvResponse.length;
+         printf("number of vowels: %d", nvResponse.numV);
       } else if (request.op = 0xAA) {
-         disemvowel(&buf[5], response.message, request.length-5);
+         printf("Disemvoweling...\n");
+         disemvowel(&buf[5], dvResponse.message, request.length-5);
+         dvResponse.length = strlen(dvResponse.message) + 5;
+         dvResponse.id = request.id;
+
+         response = (char*) &dvResponse;
+         numbytesSent = dvResponse.length;
+         printf("message: %s\n", dvResponse.message);
       }
 
-      response.length = strlen(response.message) + 5;
-      response.id = request.id;
-      printf("message: %s", response.message);
-
       // displayBuffer((char*) &response, response.length);
-      if ((numbytesSent = sendto(sockfd, (char*) &response, response.length, 0,
+      if ((numbytesSent = sendto(sockfd, response, numbytesSent, 0,
          (struct sockaddr *)&their_addr, addr_len))==-1) {
          perror("serverUDP: sendto");
          exit(1);
