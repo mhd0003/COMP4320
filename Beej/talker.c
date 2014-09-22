@@ -13,7 +13,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#define SERVERPORT "10090"	// the port users will be connecting to
+#define SERVERPORT "10038"	// the port users will be connecting to
 
 int main(int argc, char *argv[])
 {
@@ -22,10 +22,26 @@ int main(int argc, char *argv[])
 	int rv;
 	int numbytes;
 
-	if (argc != 3) {
-		fprintf(stderr,"usage: talker hostname message\n");
+	struct packet {
+		short length;
+		short id;
+		char op;
+		char* str;
+	} ;
+
+	typedef struct packet packet_t;
+	packet_t test;
+
+	if (argc != 4) {
+		fprintf(stderr,"usage: talker hostname op message\n");
 		exit(1);
 	}
+
+	test.id = 1;
+	test.op = (char)  argv[2];
+	test.str = (char*) argv[3];
+	test.length = 5 + (short) sizeof(test.str);
+
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;

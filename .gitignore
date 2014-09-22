@@ -1,36 +1,27 @@
-# Object files
 *.o
 *.ko
 *.obj
 *.elf
-
-# Libraries
 *.lib
 *.a
-
-# Shared objects (inc. Windows DLLs)
 *.dll
 *.so
 *.so.*
 *.dylib
-
-# Executables
 *.exe
 *.out
 *.app
 *.i*86
 *.x86_64
 *.hex
-
 *.class
-
-# Mobile Tools for Java (J2ME)
 .mtj.tmp/
-
-# Package Files #
 *.jar
 *.war
 *.ear
-
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+help/error_hotspot.xml
 hs_err_pid*
+
+Beej/talker
+Beej/listener
+Lab1/Desktop
