@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h> 
+#include <time.h> 
 
   
 void packSendData(char* buf, uint16_t length, uint16_t id, char op, char* message) {
@@ -33,15 +34,13 @@ uint16_t getVowels(char* buf) {
 	return (uint16_t) (((buf[4] << 8) | (buf[5])) & 0xFF);
 }
 
-void getMessage(char* buf, char* dest, uint16_t length) {
+void printMessage(char* buf, uint16_t length) {
 	int i = 4;
-	int j = 0;
-	for (i; i < length-4; i++)
+	for (i; i < length; i++)
 	{
-		dest[0] = buf[i];
-		j++;
+		printf("%c", buf[i]);
 	}
-	dest[j] = '\0';
+	printf("\n\n");
 }
 
 
@@ -65,7 +64,7 @@ void displayBuffer(char *Buffer, int length){
 
 int main(int argc, char **argv)
 {
-	double startTime;
+	clock_t time;
    int sockfd, nBytes, rv;
    struct sockaddr_in serveraddr;
 	struct hostent *server;
@@ -116,10 +115,11 @@ int main(int argc, char **argv)
 	opp = (int) atoi(argv[3]);
 	message = argv[4];
 	length = strlen(message) + 5;
-	printf("Length: %u, ID: %u, OP: %d, Message: %s \n", length, id, opp, message);
+
 	bzero(sendData, 1029);
 	packSendData(sendData, length, id, op, message);
-	//startTime = Now();
+	
+	time = clock();
    nBytes = write(sockfd, sendData, length);
 	if (nBytes < 0)
 		error("ERROR writing to socket");
@@ -129,14 +129,14 @@ int main(int argc, char **argv)
 	if (nBytes < 0)
 		error("ERROR reading from socket");
 		
-   //startTime = Now() - startTime;
+   time = clock() - time;
 		
-	//printf("Time taken: %f\n", startTime);
-	printf("Length: %u, Request ID: %u, ", getLength(recvData), getID(recvData)); 
+	printf("\nTime taken: %.4f seconds, ", time/(double)CLOCKS_PER_SEC);
+	printf("Request ID: %u, ", getID(recvData)); 
 	if (opp == 85)
 		printf("Number of vowels: %u\n", getVowels(recvData));
 	else if (opp == 170){
-		getMessage(recvData, dv, getLength(recvData));
-		printf("Response: %s\n",dv);
+		printf("Response: ");
+		printMessage(recvData, getLength(recvData));
 	}
 }
