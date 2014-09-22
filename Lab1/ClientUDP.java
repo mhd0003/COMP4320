@@ -18,15 +18,15 @@ public class ClientUDP {
    }
 
    public static short getLength(byte[] data) {
-      return (short) ( (data[0] << 8) | (data[1]));
+      return (short) (((data[0] << 8) | (data[1])) & 0xff);
    }
 
    public static short getID(byte[] data) {
-      return (short) ( (data[2] << 8) | (data[3]));
+      return (short) (((data[2] << 8) | (data[3])) & 0xff);
    }
 
    public static short getVowels(byte[] data) {
-      return (short) ( (data[4] << 8) | (data[5]));
+      return (short) (((data[4] << 8) | (data[5])) & 0xff);
    }
 
    public static String getMessage(byte[] data) {
