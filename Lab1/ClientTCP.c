@@ -3,10 +3,13 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/time.h>
 
 #define PORTNUM 10038
 
-void packSendline(char* buf, uint16_t length, uint16_t id, uint8_t op, char* message) {
+void packSendData(char* buf, uint16_t length, uint16_t id, uint8_t op, char* message) {
    int i;
    buf[0] = (length & 0xFF00) >> 8;
    buf[1] = length & 0x00FF;
@@ -19,30 +22,47 @@ void packSendline(char* buf, uint16_t length, uint16_t id, uint8_t op, char* mes
    }
 }
 
+uint16_t getID(char* buf) {
+	return (uint16_t) (((buf[2] << 8) | (buf[3])) & 0xff);
+}
+
+uint16_t getVowels(char* buf) {
+	return (uint16_t) (((buf[4] << 8) | (buf[5])) & 0xff);
+}
+
+void getMessage(char* buf, char* message) {
+	int i = 4;
+	for (i; i < strlen(buf); i++)
+	{
+		message[i-4] = buf[i];
+	}
+}
 
 
 int main(int argc, char**argv)
 {
-   int sockfd,n;
+	double startTime;
+   int sockfd,nBytes;
    struct sockaddr_in servaddr,cliaddr;
-   char sendline[1029];
-   char recvline[1029];
+   char sendData[1029];
+   char recvData[1029];
 	uint16_t length = 0;
 	uint16_t id;
 	uint8_t op;
 	char* message;
+	char dv[1024];
 	
-   if (argc != 2)
+   if (argc != 5)
    {
       printf("usage:  ClientTCP hostname ID OP Message\n");
       exit(1);
    }
 	
-	id = (uint16_t) argv[2];
-	op = (uint8_t) argv[3];
-	message = (char*)argv[4];
-	length = strlen(message) + 5;
-	packSendline(sendline, length, id, op, message);
+   id = (uint16_t) (int) argv[2];
+   op = (uint8_t) (int) argv[3];
+   message = (char*)argv[4];
+   length = strlen(message) + 5;
+   packSendData(sendData, length, id, op, message);
 		
    sockfd=socket(AF_INET,SOCK_STREAM,0);
 
@@ -53,11 +73,21 @@ int main(int argc, char**argv)
 
    connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
 
-   while (fgets(sendline, 10000,stdin) != NULL)
+   while (fgets(sendData, 10000,stdin) != NULL)
    {
-      sendto(sockfd,sendline,strlen(sendline),0,
-             (struct sockaddr *)&servaddr,sizeof(servaddr));
-      n=recvfrom(sockfd,recvline,1029,0,NULL,NULL);
-      
+		//startTime = Now();
+      sendto(sockfd,sendData,strlen(sendData),0,
+         (struct sockaddr *)&servaddr,sizeof(servaddr));
+      nBytes=recv(sockfd,recvData,1029,0);
+		
+      //startTime = Now() - startTime;
+		
+	//printf("Time taken: %f\n", startTime);
+	printf("Request ID: %s\n", getID(recvData));
+	if (op == 55)
+		printf("Number of vowels: %u\n", getVowels(recvData));
+	else if (op == 170)
+		getMessage(recvData, dv);
+		printf("Response: %s\n",dv);
    }
 }
