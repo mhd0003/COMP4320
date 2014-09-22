@@ -68,7 +68,7 @@ int main(int argc, char**argv)
 
    bzero(&servaddr,sizeof(servaddr));
    servaddr.sin_family = AF_INET;
-   servaddr.sin_addr.s_addr=inet_addr(argv[1]);
+   servaddr.sin_addr.s_addr=inet_addr(gethostbyname(argv[1]));
    servaddr.sin_port=htons(PORTNUM);
 
    connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
