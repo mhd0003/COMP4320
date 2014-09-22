@@ -24,20 +24,10 @@ class ServerTCP {
          DataOutputStream outToClient = new DataOutputStream(connectionSocket.getOutputStream());
 			
          inFromClient.read(request);
-   		for(int i = 0; i < request.length; i++)
-			{
-				System.out.format("%2x", request[i]);
-			}      
-			
+   		
          System.out.println("Got input stream");
          
          fillResponse(request, response);
-			
-         for(int i = 0; i < response.length; i++)
-			{
-				System.out.format("%2x", response[i]);
-			}
-			
 			
       	outToClient.write(response, 0, 1029);
 			response = new byte[1029];
@@ -136,7 +126,7 @@ class ServerTCP {
 
    private static String disemvowel(String str,  int length) {
       String dv = "";
-      char[] tmp = str.toCharArray();
+		char[] tmp = str.toCharArray();
       for (char ch : tmp) {
          if(isVowel(ch) != 1) {
             dv += ch + "";
