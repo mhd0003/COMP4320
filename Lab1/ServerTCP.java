@@ -45,7 +45,6 @@ class ServerTCP {
       id = putID(request);
       op = putOP(request);
       message = putMessage(request, length);
-   	System.out.println(op);
    	
    	
       if (op == 85) {
