@@ -11,45 +11,58 @@
 
 #define PORT 10038
   
-void packSendData(char* buf, uint16_t length, uint16_t id, uint8_t op, char* message) {
+void packSendData(char* buf, uint16_t length, uint16_t id, char op, char* message) {
    int i;
    buf[0] = (length & 0xFF00) >> 8;
    buf[1] = length & 0x00FF;
-   buf[2] = (id & 0xFF00) >> 8;
-   buf[3] = id & 0x00FF;
+   buf[2] = ((id & 0xFF00) >> 8) & 0xFF;
+   buf[3] = (id & 0x00FF) &0xFF;
 	buf[4] = op;
 
    for (i = 5; i < length; i++) {
       buf[i] = message[i-5];
    }
 }
-
+uint16_t getLength(char* buf) {
+      return (uint16_t) ( ((buf[0] << 8) | (buf[1]))& 0xFF);
+   }
 uint16_t getID(char* buf) {
-	return (uint16_t) (((buf[2] << 8) | (buf[3])) & 0xff);
+	return (uint16_t) (((buf[2] << 8) | (buf[3])) & 0xFF);
 }
 
 uint16_t getVowels(char* buf) {
-	return (uint16_t) (((buf[4] << 8) | (buf[5])) & 0xff);
+	return (uint16_t) (((buf[4] << 8) | (buf[5])) & 0xFF);
 }
 
-void getMessage(char* buf, char* message) {
+void getMessage(char* buf, char* dest, uint16_t length) {
 	int i = 4;
-	for (i; i < strlen(buf); i++)
+	int j = 0;
+	for (i; i < length-4; i++)
 	{
-		message[i-4] = buf[i];
+		dest[0] = buf[i];
+		j++;
 	}
+	dest[j] = '\0';
 }
 
-// get sockaddr, IPv4 or IPv6:
-void *get_in_addr(struct sockaddr *sa)
-{
-   if (sa->sa_family == AF_INET) {
-      return &(((struct sockaddr_in*)sa)->sin_addr);
+
+void displayBuffer(char *Buffer, int length){
+   int currentByte, column;
+
+   currentByte = 0;
+   printf("\n>>>>>>>>>>>> Content in hexadecimal <<<<<<<<<<<\n");
+   while (currentByte < length){
+      printf("%3d: ", currentByte);
+      column =0;
+      while ((currentByte < length) && (column < 10)){
+         printf("%2x ",Buffer[currentByte]);
+         column++;
+         currentByte++;
+      }
+      printf("\n");
    }
-
-   return &(((struct sockaddr_in6*)sa)->sin6_addr);
+   printf("\n\n");
 }
-
 
 int main(int argc, char **argv)
 {
@@ -61,7 +74,8 @@ int main(int argc, char **argv)
    char recvData[1029];
 	uint16_t length = 0;
 	uint16_t id;
-	uint8_t op;
+	char op;
+	int opp;
 	char *message;
 	char *hostname;
 	char dv[1024];
@@ -87,7 +101,7 @@ int main(int argc, char **argv)
 	}
 	
 	/* build the server's Internet address */
-	bzero((char *) &serveraddr, sizeof(serveraddr));
+	 bzero((char *) &serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
     bcopy((char *)server->h_addr, 
 	  (char *)&serveraddr.sin_addr.s_addr, server->h_length);
@@ -99,31 +113,31 @@ int main(int argc, char **argv)
 
 	
 	id = (uint16_t) atoi(argv[2]);
-	op = (uint8_t) atoi(argv[3]);
+	op =  (char) atoi(argv[3]);
+	opp = (int) atoi(argv[3]);
 	message = argv[4];
 	length = strlen(message) + 5;
-	printf("Length: %u, ID: %u, OP: %u, Message: %s \n", length, id, op, message);
+	printf("Length: %u, ID: %u, OP: %d, Message: %s \n", length, id, opp, message);
 	bzero(sendData, 1029);
 	packSendData(sendData, length, id, op, message);
-	
-		//startTime = Now();
-     	nBytes = write(sockfd, sendData, length);
-		if (nBytes < 0)
-			error("ERROR writing to socket");
+	//startTime = Now();
+   nBytes = write(sockfd, sendData, length);
+	if (nBytes < 0)
+		error("ERROR writing to socket");
 			
-		bzero(sendData, 1029);
-      nBytes = read(sockfd,recvData,1029);
-		if (nBytes < 0)
-			error("ERROR reading from socket");
+	bzero(recvData, 1029);
+   nBytes = recv(sockfd,recvData,1029, 0);
+	if (nBytes < 0)
+		error("ERROR reading from socket");
 		
-      //startTime = Now() - startTime;
+   //startTime = Now() - startTime;
 		
-		//printf("Time taken: %f\n", startTime);
-		printf("Request ID: %s\n", getID(recvData));
-		if (op == 55)
-			printf("Number of vowels: %u\n", getVowels(recvData));
-		else if (op == 170)
-			getMessage(recvData, dv);
-			printf("Response: %s\n",dv);
-
+	//printf("Time taken: %f\n", startTime);
+	printf("Length: %u, Request ID: %u, ", getLength(recvData), getID(recvData)); 
+	if (opp == 85)
+		printf("Number of vowels: %u\n", getVowels(recvData));
+	else if (opp == 170){
+		getMessage(recvData, dv, getLength(recvData));
+		printf("Response: %s\n",dv);
+	}
 }
