@@ -18,16 +18,13 @@ class ServerTCP {
       while(true){
          System.out.println("\n\nWaiting to receive...");
          Socket connectionSocket = socket.accept();
-         InetAddress clientAddress = socket.getInetAddress();
-         String clientAddressString = clientAddress.getHostAddress();
-      	
+
+			
          DataInputStream inFromClient =
                new DataInputStream(connectionSocket.getInputStream());
          DataOutputStream outToClient = new DataOutputStream(connectionSocket.getOutputStream());
-            
-         inFromClient.readFully(request);
-            
-         System.out.println("Got stream from: " + clientAddressString);
+			
+         inFromClient.read(request);
          
          fillResponse(request, response);
          
@@ -56,7 +53,7 @@ class ServerTCP {
          short nv = numVowels(message);
          response[4] = (byte) ((nv >> 8)& 0x00ff);
          response[5] = (byte) (nv & 0x00ff);
-         System.out.println("Length: " + length + " ID: " + id + "Num vowels: " + nv);
+         System.out.println("Length: " + 6 + " ID: " + id + " Num vowels: " + nv);
       }
       else if (op == 170) {
          String dv = "";
@@ -70,7 +67,7 @@ class ServerTCP {
          for (int i = 4; i < rLength; i++) {
             response[i] = bMessage[i-4];
          }
-         System.out.println("Length: " + length + " ID: " + id + "Message: " + dv);
+         System.out.println("Length: " + rLength + " ID: " + id + " Message: " + dv);
       }
    }
 	
