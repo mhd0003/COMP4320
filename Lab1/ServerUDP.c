@@ -15,7 +15,6 @@
 
 #define MAXBUFLEN 1029
 
-
 typedef struct request {
    uint16_t length;
    uint16_t id;
@@ -26,7 +25,7 @@ typedef struct request {
 typedef struct dvResponse {
    uint16_t length;
    uint16_t id;
-   char* message;
+   char message[MAXBUFLEN];
 } dvResponse_t;
 
 typedef struct nvResponse {
@@ -34,6 +33,46 @@ typedef struct nvResponse {
    uint16_t id;
    uint16_t numV;
 } nvResponse_t;
+
+// From Dr. Biaz's code
+void displayBuffer(char *Buffer, int length){
+   int currentByte, column;
+
+   currentByte = 0;
+   printf("\n>>>>>>>>>>>> Content in hexadecimal <<<<<<<<<<<\n");
+   while (currentByte < length){
+      printf("%3d: ", currentByte);
+      column =0;
+      while ((currentByte < length) && (column < 10)){
+         printf("%2x ",Buffer[currentByte]);
+         column++;
+         currentByte++;
+      }
+      printf("\n");
+   }
+   printf("\n\n");
+}
+
+void packdvStruct(char* buf, uint16_t length, uint16_t id, char* message) {
+   int i;
+   buf[0] = (length & 0xFF00) >> 8;
+   buf[1] = length & 0x00FF;
+   buf[2] = (id & 0xFF00) >> 8;
+   buf[3] = id & 0x00FF;
+
+   for (i = 4; i < length; i++) {
+      buf[i] = message[i-4];
+   }
+}
+
+void packnvStruct(char* buf, uint16_t length, uint16_t id, uint16_t numV) {
+   buf[0] = (length & 0xFF00) >> 8;
+   buf[1] = length & 0x00FF;
+   buf[2] = (id & 0xFF00) >> 8;
+   buf[3] = id & 0x00FF;
+   buf[4] = (numV & 0xFF00) >> 8;
+   buf[5] = numV & 0x00FF;
+}
 
 int isVowel(char c)
 {
@@ -54,15 +93,13 @@ int isVowel(char c)
    }
 }
 
-uint16_t numVowels(char* str, int len) {
-   int i = 0; 
-	uint16_t count = 0;
+int numVowels(char* str, int len) {
+   int i, count = 0;
 
    for (i = 0; i < len; i++) {
       if(isVowel(str[i])) {
          count++;
       }
-
    }
 
    return count;
@@ -75,8 +112,8 @@ void disemvowel(char* source, char* dest, int len) {
       if(!isVowel(source[i])) {
          dest[j++] = source[i];
       }
-
    }
+   dest[j] = '\0';
 }
 
 // get sockaddr, IPv4 or IPv6:
@@ -91,7 +128,6 @@ void *get_in_addr(struct sockaddr *sa)
 
 int main(int argc, char* argv[])
 {
-   int packetSize = 0;
    int sockfd;
    struct addrinfo hints, *servinfo, *p;
    int rv;
@@ -101,9 +137,8 @@ int main(int argc, char* argv[])
    socklen_t addr_len;
    char their_addr_str[INET6_ADDRSTRLEN];
    request_t request;
-   char* sendData = NULL;
-   char message[MAXBUFLEN];
-
+   dvResponse_t dvResponse;
+   nvResponse_t nvResponse;
 
    if (argc != 2)
       exit(1);
@@ -143,7 +178,7 @@ int main(int argc, char* argv[])
    freeaddrinfo(servinfo);
 
    while(1) {
-      printf("listener: waiting to recvfrom...\n");
+      printf("\n\nwaiting to recvfrom...\n");
 
       addr_len = sizeof their_addr;
       if ((numbytesRecv = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
@@ -152,43 +187,47 @@ int main(int argc, char* argv[])
          exit(1);
       }
 
-      printf("listener: got packet from %s\n",
+      printf("Got packet from %s. ",
          inet_ntop(their_addr.ss_family,
             get_in_addr((struct sockaddr *)&their_addr),
             their_addr_str, sizeof their_addr_str));
+      // displayBuffer(buf, numbytesRecv);
 
-      request.length = (buf[0] << 8) | buf[1];
-      request.id = (buf[2] << 8) | buf[3];
+      request.length = ((uint8_t) (buf[0] << 8) | (uint8_t) buf[1]);
+      request.id = (uint8_t) (buf[2] << 8) | (uint8_t) buf[3];
       request.op = buf[4];
+      printf("length is: %d, id is: %d, op is: %d\n", request.length, request.id, request.op);
+      // printf(", message is: ");
+      // for (count = 5; count < numbytesRecv; count++) {
+      //    printf("%c", buf[count]);
+      // }
+      // printf("\n");
 
       if (request.op == 0x55) {
-			printf("this is working");
-			nvResponse_t response;
-         response.length = 6;
-			packetSize = 6;
-			response.id = request.id;
-			response.numV = numVowels(&buf[5], request.length-5);
-			sendData = (char*) &response;
-			
-      } else if (request.op = 0xAA) {
-			dvResponse_t response;
-         disemvowel(&buf[5], message, request.length-5);
-			response.length = 4 + strlen(message);
-			packetSize = response.length;
-			response.id = request.id;
-			response.message = message;
-			sendData = (char*) &response;
-      }
-			printf("length %u %u", sendData[0], sendData[1]);
-			printf("id %u %u", sendData[2], sendData[3]);
-			printf("num vowels %u %u", sendData[4], sendData[5]);
-      
+         nvResponse.length = 6;
+         nvResponse.id = request.id;
+         nvResponse.numV = numVowels(&buf[5], request.length-5);
 
-      if ((numbytesSent = sendto(sockfd, &sendData, packetSize, 0,
+         packnvStruct(buf, nvResponse.length, nvResponse.id, nvResponse.numV);
+         numbytesSent = nvResponse.length;
+         printf("number of vowels: %d\n", nvResponse.numV);
+      } else if (request.op = 0xAA) {
+         disemvowel(&buf[5], dvResponse.message, request.length-5);
+         dvResponse.length = strlen(dvResponse.message) + 5;
+         dvResponse.id = request.id;
+
+         packdvStruct(buf, dvResponse.length, dvResponse.id, dvResponse.message);
+         numbytesSent = dvResponse.length;
+         printf("message: %s\n", dvResponse.message);
+      }
+
+      if ((numbytesSent = sendto(sockfd, buf, numbytesSent, 0,
          (struct sockaddr *)&their_addr, addr_len))==-1) {
          perror("serverUDP: sendto");
          exit(1);
       }
+
+      // displayBuffer(buf, numbytesSent);
    }
    close(sockfd);
 

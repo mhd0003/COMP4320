@@ -4,6 +4,8 @@ import java.net.InetAddress;
 import java.util.Arrays;
 
 public class ClientUDP {
+   static final String COUNT_VOWELS = "85";
+   static final String DISEMVOWEL = "170";
 
    public static void putLength(byte[] data, short length) {
       data[0] = (byte) (length >> 8);
@@ -16,11 +18,15 @@ public class ClientUDP {
    }
 
    public static short getLength(byte[] data) {
-      return (short) ( (data[1] << 8) | (data[0]));
+      return (short) (((data[0] << 8) | (data[1])) & 0xff);
    }
 
    public static short getID(byte[] data) {
-      return (short) ( (data[3] << 8) | (data[2]));
+      return (short) (((data[2] << 8) | (data[3])) & 0xff);
+   }
+
+   public static short getVowels(byte[] data) {
+      return (short) (((data[4] << 8) | (data[5])) & 0xff);
    }
 
    public static String getMessage(byte[] data) {
@@ -57,13 +63,12 @@ public class ClientUDP {
 
       // requestID and op
       id = Short.parseShort(args[1]);
-      op = Byte.parseByte(args[2]);
+      op = (byte) Integer.parseInt(args[2]);
 
       // 1 byte for each char in message + 5 bytes for hostname,
       // requestID and op
       length = (short) str.length();
       length += 5;
-
       sendData = new byte[length];
 
       // Assuming big endian here
@@ -75,6 +80,7 @@ public class ClientUDP {
          sendData[i++] = (byte) ch;
       }
 
+      // System.out.println("Data: " + Arrays.toString(sendData));
       sendPacket = new DatagramPacket(sendData, (int) length, addr, portNum);
       DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
       long startTime = System.currentTimeMillis();
@@ -84,14 +90,27 @@ public class ClientUDP {
 
       System.out.println("Time taken: " + (System.currentTimeMillis() - startTime) + " ms");
       System.out.println("Request ID: " + getID(receiveData));
-      System.out.println("Response: " + getMessage(receiveData));
-      
-      //for testing purposes
-		for (int j = 0; j < receiveData.length; j++)
-		{
-			System.out.print(receiveData[j]);
-		}
-			System.out.println();
-      
+      if (args[2].equals(COUNT_VOWELS)) {
+         System.out.println("Number of vowels: " + getVowels(receiveData));
+      } else if (args[2].equals(DISEMVOWEL)) {
+         System.out.println("Response: " + getMessage(receiveData));
+      }
+
+      /* I think this should be for the server:
+      if (op == 0xAA) {
+         int numVowel = receiveData[4];
+         numVowel = numVowel << 8;
+         numVowel = numVowel | receiveData[5];
+
+         System.out.println(str + " contains " + numVowel + "vowels.");
+      } else if (op == 0x55) {
+         String dv = "";
+         for(i = 4; i < receiveData.length; i++)
+         {
+            dv += (char)receiveData[i];
+         }
+         System.out.println(str + " converts to " + dv);
+      }
+      */
    }
 }
