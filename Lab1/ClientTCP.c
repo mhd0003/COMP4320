@@ -9,7 +9,6 @@
 #include <netinet/in.h>
 #include <netdb.h> 
 
-#define PORT 10038
   
 void packSendData(char* buf, uint16_t length, uint16_t id, char op, char* message) {
    int i;
@@ -79,15 +78,15 @@ int main(int argc, char **argv)
 	char *message;
 	char *hostname;
 	char dv[1024];
-	char *port = "10038";
+	int port;
 	
    if (argc != 5)
    {
-      printf("usage:  ClientTCP hostname ID OP Message\n");
+      printf("usage:  ClientTCP hostname PortNum OP Message\n");
       exit(1);
    }
 	hostname = argv[1];
-
+	port = atoi(argv[2]);
 	/* create the socket*/
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0)
@@ -105,14 +104,14 @@ int main(int argc, char **argv)
     serveraddr.sin_family = AF_INET;
     bcopy((char *)server->h_addr, 
 	  (char *)&serveraddr.sin_addr.s_addr, server->h_length);
-    serveraddr.sin_port = htons(PORT);
+    serveraddr.sin_port = htons(port);
 	
 	/* connect: create a connection with the server */
 	if (connect(sockfd, &serveraddr, sizeof(serveraddr)) < 0) 
       error("ERROR connecting");
 
 	
-	id = (uint16_t) atoi(argv[2]);
+	id = 1;
 	op =  (char) atoi(argv[3]);
 	opp = (int) atoi(argv[3]);
 	message = argv[4];
