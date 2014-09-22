@@ -8,25 +8,27 @@ public class ClientUDP {
    static final String DISEMVOWEL = "170";
 
    public static void putLength(byte[] data, short length) {
-      data[0] = (byte) (length >> 8);
-      data[1] = (byte) (length & 0x00ff);
+      int tmp = ((length >> 8) & 0x00ff) & 0xFF;
+		data[0] = (byte) tmp;
+		tmp = (length & 0x00ff) & 0xFF;
+      data[1] = (byte) tmp;
    }
 
    public static void putID(byte[] data, short id) {
-      data[2] = (byte) (id >> 8);
+      data[2] = (byte) ((id >> 8)& 0x00ff);
       data[3] = (byte) (id & 0x00ff);
    }
 
    public static short getLength(byte[] data) {
-      return (short) (((data[0] << 8) | (data[1])) & 0xff);
+      return (short) ( ((data[0] << 8) | (data[1]))& 0xFF);
    }
 
    public static short getID(byte[] data) {
-      return (short) (((data[2] << 8) | (data[3])) & 0xff);
+      return (short) ( ((data[2] << 8) | (data[3]))& 0xff);
    }
 
    public static short getVowels(byte[] data) {
-      return (short) (((data[4] << 8) | (data[5])) & 0xff);
+      return (short) ( ((data[4] << 8) | (data[5]))&0xff);
    }
 
    public static String getMessage(byte[] data) {
@@ -34,8 +36,8 @@ public class ClientUDP {
    }
 
    public static void main(String args[]) throws Exception {
-
-      int portNum = 10038;
+		
+      int portNum;
       DatagramPacket sendPacket;
       short id = 0;
       short length;
@@ -49,12 +51,14 @@ public class ClientUDP {
 
       if(args.length != 4)
       {
-         System.out.println("Usage: hostname requestID op message");
-      }
+         System.out.println("Usage: hostname PortNumber opperation message");
+      	System.exit(1);
+		}
 
-      // hostname
+      // hostname and port
       addr = InetAddress.getByName(args[0]);
-
+		portNum = Integer.parseInt(args[1]);
+		
       // first 1024 chars of message
       if (args[3].length() < 1024)
          str = args[3];
@@ -62,7 +66,7 @@ public class ClientUDP {
          str = args[3].substring(0, 1024);
 
       // requestID and op
-      id = Short.parseShort(args[1]);
+      id = 1;
       op = (byte) Integer.parseInt(args[2]);
 
       // 1 byte for each char in message + 5 bytes for hostname,
