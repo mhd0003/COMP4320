@@ -191,10 +191,10 @@ int main(int argc, char* argv[])
          inet_ntop(their_addr.ss_family,
             get_in_addr((struct sockaddr *)&their_addr),
             their_addr_str, sizeof their_addr_str));
+      // displayBuffer(buf, numbytesRecv);
 
-
-      request.length = (buf[0] << 8) | buf[1];
-      request.id = (buf[2] << 8) | buf[3];
+      request.length = ((uint8_t) (buf[0] << 8) | (uint8_t) buf[1]);
+      request.id = (uint8_t) (buf[2] << 8) | (uint8_t) buf[3];
       request.op = buf[4];
       printf("length is: %d, id is: %d, op is: %d\n", request.length, request.id, request.op);
       // printf(", message is: ");
