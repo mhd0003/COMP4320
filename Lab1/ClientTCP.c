@@ -64,7 +64,7 @@ void displayBuffer(char *Buffer, int length){
 
 int main(int argc, char **argv)
 {
-	clock_t time;
+	struct timeval before, after;
    int sockfd, nBytes, rv;
    struct sockaddr_in serveraddr;
 	struct hostent *server;
@@ -119,7 +119,7 @@ int main(int argc, char **argv)
 	bzero(sendData, 1029);
 	packSendData(sendData, length, id, op, message);
 	
-	time = clock();
+	gettimeofday(&before, NULL);
    nBytes = write(sockfd, sendData, length);
 	if (nBytes < 0)
 		error("ERROR writing to socket");
@@ -129,9 +129,10 @@ int main(int argc, char **argv)
 	if (nBytes < 0)
 		error("ERROR reading from socket");
 		
-   time = clock() - time;
+   gettimeofday(&after, NULL);
 		
-	printf("\nTime taken: %.4f seconds, ", time/(double)CLOCKS_PER_SEC);
+	printf("\nTime taken: %.3f microseconds, ", 
+		(float)(((after.tv_sec - before.tv_sec)*1000000) + (after.tv_usec - before.tv_usec))/1000);
 	printf("Request ID: %u, ", getID(recvData)); 
 	if (opp == 85)
 		printf("Number of vowels: %u\n", getVowels(recvData));
