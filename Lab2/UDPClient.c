@@ -69,6 +69,7 @@ int main(int argc, char *argv[])
 	uint8_t requestID;
 	uint8_t GID;
 	char buf[1024];
+   char rBuf[1024];
 	int tmp;
 
 	if (argc < 5) {
@@ -121,16 +122,34 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "talker: failed to bind socket\n");
 		return 2;
 	}
+   
+   freeaddrinfo(servinfo);
 
-	if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0,
-			 p->ai_addr, p->ai_addrlen)) == -1) {
-		perror("UDPClient: sendto");
-		exit(1);
-	}
+   bool valid = false;
+   int numAttempts = 0;
+   
+   while (!valid && (numAttempts < 7)) {
+   	if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0,
+   			 p->ai_addr, p->ai_addrlen)) == -1) {
+   		perror("UDPClient: sendto");
+   		exit(1);
+   	}
+      
+      if ((numbytes = recvfrom(sockfd, rBuf, sizeof(rBuf)-1, 0,
+            (struct sockaddr *)&their_addr, &addr_len)) ==-1){
+            perror("recvfrom");
+            exit(1);
+      }
+      
+      //validate checksum and length, check if got a valid response
+      //if valid set valid to true, else increment numAttempts
+   }
 
-	freeaddrinfo(servinfo);
-
-	printf("talker: sent %d bytes to %s\n", numbytes, argv[1]);
+	if (valid) {
+      //print out the ips
+   } else
+      perror("UDPClient: Timeout");
+      
 	close(sockfd);
 
 	return 0;

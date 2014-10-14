@@ -9,7 +9,7 @@ public class UDPServer {
 		int checksum;
 		byte GID;
 		byte requestID;
-		String[] ipAddresses;
+		String[] hostnames;
 		short numipAddresses = 0;
 		
 		if( args.length != 1) {
@@ -28,33 +28,40 @@ public class UDPServer {
 			
 			length = getLength(receiveData);
 			checksum = getChecksum(receiveData);
-			if (valid(receiveData, length, checksum)){
+			if (!testLength(receiveData, length)){
+            sendData = new byte[5];
+				sendData[0] = 0x01;
+				sendData[1] = 127;
+				sendData[2] = 127;
+				sendData[3] = 0x00;
+				sendData[4] = 0x00;
+				DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, portNum);
+				serverSocket.send(sendPacket);
+            
+         } else if(!testChecksum(receiveData, checksum)) {
+            GID = getGID(receiveData);
+				requestID = getRequestID(receiveData);
+            sendData = new byte[5];
+            sendData[1] = GID;
+            sendData[2] = requestID;
+            sendData[3] = 0x00;
+            sendData[4] = 0x00;
+            sendData[0] = (byte)calcChecksum(sendData);
+            
+         }else {
 				GID = getGID(receiveData);
 				requestID = getRequestID(receiveData);
 				numipAddresses = getNumIP(receiveData);
 				length = (short) (5 + numipAddresses * 4);
 				sendData = new byte[length];
 				packLength(sendData, length);
-				sendData[2] = (byte) checksum;
 				sendData[3] = GID;
 				sendData[4] = requestID;
 				
-				ipAddresses = getHostnames(numipAddresses, receiveData);
-				for (int i = 0; i < ipAddresses.length; i++) {
-					ipAddresses[i] = getIPAddress(ipAddresses[i]);
-				}
-				packIP(sendData, ipAddresses);
-				DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, portNum);
-				serverSocket.send(sendPacket);
-			}
-			else
-			{
-				sendData = new byte[5];
-				sendData[0] = 0x01;
-				sendData[1] = 127;
-				sendData[2] = 127;
-				sendData[3] = 0x00;
-				sendData[4] = 0x00;
+				hostnames = getHostnames(numipAddresses, receiveData);
+				packIP(sendData, hostnames);
+            
+            sendData[2] = (byte) (calcChecksum(sendData) & 0xFF);
 				DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, portNum);
 				serverSocket.send(sendPacket);
 			}
@@ -77,8 +84,9 @@ public class UDPServer {
 		 return data[4];
 	}
 	
-	public static boolean testChecksum(byte[] data, int checksum) {
-		int sum = 0;
+   public static int calcChecksum(byte[] data)
+   {
+      int sum = 0;
       int tmp;
 		for (int i = 0; i < data.length; i++) {
 			sum += data[i];
@@ -90,7 +98,11 @@ public class UDPServer {
 		}
 		
 		sum = ~sum & 0xff;
-		
+      return sum;
+   }
+   
+	public static boolean testChecksum(byte[] data, int checksum) {
+		int sum = calcChecksum(data);
 		if (sum == checksum)
 			return true;
 		
@@ -128,7 +140,6 @@ public class UDPServer {
 		
 		for(int i = 0; i < data.length; i++) {
 			if (data[i] == 127) {
-				hostnames[counter] = hostname.replace(".",  "");
 				counter++;
 			}
 			else
@@ -137,13 +148,18 @@ public class UDPServer {
 		return hostnames;
 	}
 	
-	public static String getIPAddress(String hostname) {
+	public static byte[] getIPAddress(String hostname) {
 		try {
-			return InetAddress.getByName(hostname).toString();
+			return InetAddress.getByName(hostname).getAddress();
 		}
 		catch (UnknownHostException e)
 		{
-			return "255.255.255.255";
+			byte[] tmp = new byte[4];
+         tmp[0] = (byte) (255 & 0xFF);
+         tmp[1] = (byte) (255 & 0xFF);
+         tmp[2] = (byte) (255 & 0xFF);
+         tmp[3] = (byte) (255 & 0xFF);
+         return tmp;
 		}
 	}
 	
@@ -154,10 +170,10 @@ public class UDPServer {
 		data[1] = (byte) tmp;
 	}
 	
-	public static void packIP(byte[] data, String[] IP) {
+	public static void packIP(byte[] data, String[] Host) {
 		int p = 5;
-		for (int i = 0;  i < IP.length; i++) {
-			byte[] tmp = IP[i].getBytes();
+		for (int i = 0;  i < Host.length; i++) {
+			byte[] tmp = getIPAddress(Host[i]);
 			for (int k = 0; k < tmp.length; k++) {
 				data[p] = tmp[k];
 				p++;
