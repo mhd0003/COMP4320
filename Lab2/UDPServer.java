@@ -27,7 +27,6 @@ public class UDPServer {
 			System.out.println("Received packet from " + IPAddress);
 			
 			length = getLength(receiveData);
-			checksum = getChecksum(receiveData);
 			if (!testLength(receiveData, length)){
             sendData = new byte[5];
 				sendData[0] = 0x01;
@@ -38,7 +37,7 @@ public class UDPServer {
 				DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, portNum);
 				serverSocket.send(sendPacket);
             
-         } else if(!testChecksum(receiveData, checksum)) {
+         } else if(!testChecksum(receiveData)) {
             GID = getGID(receiveData);
 				requestID = getRequestID(receiveData);
             sendData = new byte[5];
@@ -47,6 +46,8 @@ public class UDPServer {
             sendData[3] = 0x00;
             sendData[4] = 0x00;
             sendData[0] = (byte)calcChecksum(sendData);
+            DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, portNum);
+				serverSocket.send(sendPacket);
             
          }else {
 				GID = getGID(receiveData);
@@ -101,9 +102,18 @@ public class UDPServer {
       return sum;
    }
    
-	public static boolean testChecksum(byte[] data, int checksum) {
-		int sum = calcChecksum(data);
-		if (sum == checksum)
+	public static boolean testChecksum(byte[] data) {
+		int sum = 0;
+      int tmp;
+		for (int i = 0; i < data.length; i++) {
+			sum += data[i];
+         while (sum > 255){
+            tmp = sum & 0xFF;
+            tmp++;
+            sum = tmp;
+         }
+		}
+		if (sum == 0xFF)
 			return true;
 		
 		return false; 

@@ -29,6 +29,43 @@ char calcChecksum(char* buf) {
 	return (char)checksum;
 }
 
+bool testLength(char* buf) {
+   uint16_t length = (uint16_t) ( ((buf[0] << 8) | (buf[1]))& 0xFF);
+   int counter = 0;
+   int i = 0;
+   for (i; i < sizeof(buf); i++) {
+      if(buf[i] != '\0')
+         counter++;
+   }
+   return length == counter;
+}
+
+bool testValidResponse(char* buf) {
+   if (!buf[3] == 0x00 || !buf[4] == 0x00)
+      return true;
+   else
+      return false;
+}
+
+bool testChecksum(char* buf) {
+   int checksum = 0;
+   int tmp = 0;
+	int i = 0;
+	for (i; i < sizeof(buf); i++) {
+		checksum += buf[i];
+      while (checksum > 255) {
+         tmp = checksum & 0x000000FF;
+         tmp++;
+         checksum = tmp;
+      }
+	}
+   
+   if (checksum == 0xFF)
+      return true;
+   else 
+      return false;
+}
+
 void packSendData(char* buf, char* tempBuff[], uint8_t gid, uint8_t ID) {
 	uint16_t length;
 	uint8_t checksum;
@@ -135,12 +172,17 @@ int main(int argc, char *argv[])
    		exit(1);
    	}
       
+      rbuf = new char[1024];
+      
       if ((numbytes = recvfrom(sockfd, rBuf, sizeof(rBuf)-1, 0,
             (struct sockaddr *)&their_addr, &addr_len)) ==-1){
             perror("recvfrom");
             exit(1);
       }
       
+      if (!testLength(rBuf))
+         numAttempts++;
+      else if 
       //validate checksum and length, check if got a valid response
       //if valid set valid to true, else increment numAttempts
    }
