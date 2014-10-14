@@ -14,9 +14,15 @@
 
 char calcChecksum(char* buf) {
 	int checksum = 0;
+   int tmp = 0;
 	int i = 0;
 	for (i; i < sizeof(buf); i++) {
 		checksum += buf[i];
+      while (checksum > 255) {
+         tmp = checksum & 0x000000FF;
+         tmp++;
+         checksum = tmp;
+      }
 	}
 
 	checksum = ~checksum & 0x000000FF;

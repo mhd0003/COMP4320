@@ -1,12 +1,12 @@
 import java.net.*;
 
-public class udpServer {
+public class UDPServer {
 	public static void main(String args[]) throws Exception {
 		int portNum;
 		byte[] receiveData = new byte[1024];
 		byte[] sendData = null;
 		short length;
-		byte checksum;
+		int checksum;
 		byte GID;
 		byte requestID;
 		String[] ipAddresses;
@@ -35,7 +35,7 @@ public class udpServer {
 				length = (short) (5 + numipAddresses * 4);
 				sendData = new byte[length];
 				packLength(sendData, length);
-				sendData[2] = checksum;
+				sendData[2] = (byte) checksum;
 				sendData[3] = GID;
 				sendData[4] = requestID;
 				
@@ -65,8 +65,8 @@ public class udpServer {
 		 return (short) ( ((data[0] << 8) | (data[1]))& 0xFF);
 	}
 	
-	public static byte getChecksum(byte[] data) {
-		 return data[2];
+	public static int getChecksum(byte[] data) {
+		 return (int) data[2];
 	}
 	
 	public static byte getGID(byte[] data) {
@@ -77,10 +77,16 @@ public class udpServer {
 		 return data[4];
 	}
 	
-	public static boolean testChecksum(byte[] data, byte checksum) {
+	public static boolean testChecksum(byte[] data, int checksum) {
 		int sum = 0;
+      int tmp;
 		for (int i = 0; i < data.length; i++) {
 			sum += data[i];
+         while (sum > 255){
+            tmp = sum & 0xFF;
+            tmp++;
+            sum = tmp;
+         }
 		}
 		
 		sum = ~sum & 0xff;
@@ -98,7 +104,7 @@ public class udpServer {
 			return false;
 	}
 	
-	public static boolean valid(byte[] data, short length, byte checksum) {
+	public static boolean valid(byte[] data, short length, int checksum) {
 		if (testLength(data, length) && testChecksum(data, checksum))
 			return true;
 		else
