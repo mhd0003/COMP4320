@@ -1,5 +1,3 @@
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -11,88 +9,100 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#define MAX_BUF_LEN 1024
 
 char calcChecksum(char* buf) {
 	int checksum = 0;
-   int tmp = 0;
+	int tmp = 0;
 	int i = 0;
 	for (i; i < sizeof(buf); i++) {
 		checksum += buf[i];
-      while (checksum > 255) {
-         tmp = checksum & 0x000000FF;
-         tmp++;
-         checksum = tmp;
-      }
+		while (checksum > 255) {
+			tmp = checksum & 0x000000FF;
+			tmp++;
+			checksum = tmp;
+		}
 	}
 
 	checksum = ~checksum & 0x000000FF;
 	return (char)checksum;
 }
 
-bool testLength(char* buf) {
-   uint16_t length = (uint16_t) ( ((buf[0] << 8) | (buf[1]))& 0xFF);
-   int counter = 0;
-   int i = 0;
-   for (i; i < sizeof(buf); i++) {
-      if(buf[i] != '\0')
-         counter++;
-   }
-   return length == counter;
+int testLength(char* buf) {
+	uint16_t claimedLen = (uint16_t) ( ((buf[0] << 8) | (buf[1]))& 0xFF);
+	int actualLen = 0;
+	int i = 0;
+	for (i; i < MAX_BUF_LEN; i++) {
+		actualLen++;
+		if(buf[i] == '\0')
+			break;
+	}
+
+	return claimedLen == actualLen;
 }
 
-bool testValidResponse(char* buf) {
-   if (!buf[3] == 0x00 || !buf[4] == 0x00)
-      return true;
-   else
-      return false;
+int testValidResponse(char* buf) {
+	if (!buf[3] == 0x00 || !buf[4] == 0x00)
+		return 1;
+	else
+		return 0;
 }
 
-bool testChecksum(char* buf) {
-   int checksum = 0;
-   int tmp = 0;
+int testChecksum(char* buf) {
+	int checksum = 0;
+	int tmp = 0;
 	int i = 0;
 	for (i; i < sizeof(buf); i++) {
 		checksum += buf[i];
-      while (checksum > 255) {
-         tmp = checksum & 0x000000FF;
-         tmp++;
-         checksum = tmp;
-      }
+		while (checksum > 255) {
+			tmp = checksum & 0x000000FF;
+			tmp++;
+			checksum = tmp;
+		}
 	}
-   
-   if (checksum == 0xFF)
-      return true;
-   else 
-      return false;
+
+	if (checksum == 0xFF)
+		return 1;
+	else
+		return 0;
 }
 
-void packSendData(char* buf, char* tempBuff[], uint8_t gid, uint8_t ID) {
-	uint16_t length;
+// b0 b1 = packet length
+// b2 = checksum
+// b3 = groupID
+// b4 = reqID
+// b5 = '~' = 0x7E
+void packSendData(char* buf, char* tempBuff[], int numHosts, uint8_t gid, uint8_t ID) {
+	uint16_t totalLen;
 	uint8_t checksum;
+	int hostLen;
+	char* host;
 
-	length = 5;
+	totalLen = 5;
 	buf[3] = gid;
 	buf[4] = ID;
 	buf[5] = 0x7E;
 
-	int i = 6;
-	int j = 0;
-	int k = 0;
-	
-	for (j; j < sizeof(tempBuff); j++){
-		char* tmpHost = tempBuff[j];
-		for (k; k < sizeof(tmpHost); k++) {
-			length++;
-			buf[i++] = tmpHost[k];
+	int i = 6, j, k;
+
+	for (j = 0; j < numHosts; j++){
+		host = tempBuff[j];
+		hostLen = strlen(host);
+		for (k = 0; k < hostLen; k++) {
+			totalLen++;
+			buf[i++] = host[k];
 		}
-		if (sizeof(tempBuff) - 1 != j) {
-			buf[i++] = 0x7E;
-			length++;
-		}
+
+		buf[i++] = 0x7E;
+		totalLen++;
 	}
 
-	buf[0] = (length & 0xFF00) >> 8;
-	buf[1] = length & 0x00FF;
+	// remove last '~'
+	buf[i-1] = 0;
+	totalLen--;
+
+	buf[0] = (totalLen & 0xFF00) >> 8;
+	buf[1] = totalLen & 0x00FF;
 	buf[2] = calcChecksum(buf);
 }
 
@@ -105,8 +115,8 @@ int main(int argc, char *argv[])
 	int portNum;
 	uint8_t requestID;
 	uint8_t GID;
-	char buf[1024];
-   char rBuf[1024];
+	char buf[MAX_BUF_LEN];
+	char rBuf[MAX_BUF_LEN];
 	int tmp;
 
 	if (argc < 5) {
@@ -114,10 +124,10 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	portNum = stoi(argv[2]);
+	portNum = atoi(argv[2]);
 	GID = (uint8_t) portNum - 10010;
 
-	tmp = stoi(argv[3]);
+	tmp = atoi(argv[3]);
 	if (tmp <= 127)
 		requestID = (short)tmp;
 	else
@@ -125,21 +135,22 @@ int main(int argc, char *argv[])
 
 	int i = 4;
 	int j = 0;
-	int size = argc - 5;
-	char* tempBuf[size];
-	for (i; i < argc-1 && j < 7; i++) {
-		tempBuf[j] = argc[i];
+	int numHosts = argc - 4; // If only 1 hostname, argc = 5
+	char* tempBuf[numHosts];
+	// for (i; i < argc-1 && j < 7; i++) {
+	for (i = 4; i < argc; i++) {
+		tempBuf[j] = argv[i];
 		j++;
 	}
 
-	fillBuffer(buf, tempBuf, GID, requestID);
+	packSendData(buf, tempBuf, numHosts, GID, requestID);
 
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;
 
-	if ((rv = getaddrinfo(argv[1], portNum, &hints, &servinfo)) != 0) {
+	if ((rv = getaddrinfo(argv[1], argv[2], &hints, &servinfo)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
 	}
@@ -159,39 +170,42 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "talker: failed to bind socket\n");
 		return 2;
 	}
-   
-   freeaddrinfo(servinfo);
 
-   bool valid = false;
-   int numAttempts = 0;
-   
-   while (!valid && (numAttempts < 7)) {
-   	if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0,
-   			 p->ai_addr, p->ai_addrlen)) == -1) {
-   		perror("UDPClient: sendto");
-   		exit(1);
-   	}
-      
-      rbuf = new char[1024];
-      
-      if ((numbytes = recvfrom(sockfd, rBuf, sizeof(rBuf)-1, 0,
-            (struct sockaddr *)&their_addr, &addr_len)) ==-1){
-            perror("recvfrom");
-            exit(1);
-      }
-      
-      if (!testLength(rBuf))
-         numAttempts++;
-      else if 
-      //validate checksum and length, check if got a valid response
-      //if valid set valid to true, else increment numAttempts
-   }
+	freeaddrinfo(servinfo);
+
+	int valid = 0;
+	int numAttempts = 0;
+
+	while (!valid && (numAttempts < 7)) {
+		memset(rBuf, 0, MAX_BUF_LEN);
+
+		// send packet
+		if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0,
+				p->ai_addr, p->ai_addrlen)) == -1) {
+			perror("UDPClient: sendto");
+			continue;
+		}
+
+		// receive packet
+		if ((numbytes = recv(sockfd, rBuf, MAX_BUF_LEN-1, 0)) == -1) {
+			perror("recvfrom");
+			continue;
+		}
+
+		// validate packet's length and checksum
+		if (testLength(rBuf) && testChecksum(rBuf)) {
+			valid = 1;
+		} else {
+			numAttempts++;
+		}
+	}
 
 	if (valid) {
-      //print out the ips
-   } else
-      perror("UDPClient: Timeout");
-      
+		// print out the ips
+	} else {
+		perror("UDPClient: Timeout");
+	}
+
 	close(sockfd);
 
 	return 0;
