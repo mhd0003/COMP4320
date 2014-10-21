@@ -3,7 +3,7 @@ import java.net.*;
 public class UDPServer {
 	public static void main(String args[]) throws Exception {
 		int portNum;
-		byte[] receiveData = new byte[1024];
+		byte[] receiveData = new byte[4098];
 		byte[] sendData = null;
 		short length;
 		int checksum;
@@ -28,6 +28,7 @@ public class UDPServer {
 			
 			length = getLength(receiveData);
 			if (!testLength(receiveData, length)){
+            System.out.println("bad length");
             sendData = new byte[5];
 				sendData[0] = 0x01;
 				sendData[1] = 127;
@@ -38,6 +39,7 @@ public class UDPServer {
 				serverSocket.send(sendPacket);
             
          } else if(!testChecksum(receiveData)) {
+            System.out.println("bad checksum");
             GID = getGID(receiveData);
 				requestID = getRequestID(receiveData);
             sendData = new byte[5];
@@ -50,6 +52,7 @@ public class UDPServer {
 				serverSocket.send(sendPacket);
             
          }else {
+            System.out.println("VALID");
 				GID = getGID(receiveData);
 				requestID = getRequestID(receiveData);
 				numipAddresses = getNumIP(receiveData);
@@ -66,6 +69,7 @@ public class UDPServer {
 				DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, portNum);
 				serverSocket.send(sendPacket);
 			}
+         System.out.println("Sent Packet");
 		}
 	}
 	
@@ -126,8 +130,8 @@ public class UDPServer {
 			return false;
 	}
 	
-	public static boolean valid(byte[] data, short length, int checksum) {
-		if (testLength(data, length) && testChecksum(data, checksum))
+	public static boolean valid(byte[] data, short length) {
+		if (testLength(data, length) && testChecksum(data))
 			return true;
 		else
 			return false;

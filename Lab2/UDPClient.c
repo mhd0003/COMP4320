@@ -9,7 +9,23 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#define MAX_BUF_LEN 1024
+#define MAX_BUF_LEN 4098
+
+void printIP(char* buf) {
+   int pointer = 5;
+   int numIP = 0;
+   int length = (uint16_t) ( ((buf[0] << 8) | (buf[1]))& 0xFF);
+   int counter = 1;
+   length = length - 5;
+   numIP = length / 4;
+   
+   while (numIP != 0) {
+      printf("%f: %s.%s.%s.%s\n", counter, buf[pointer], buf[pointer+1], buf[pointer+2], buf[pointer+3]);
+      counter++;
+      numIP--;
+      pointer = pointer +4;
+   }
+}
 
 char calcChecksum(char* buf) {
 	int checksum = 0;
@@ -191,7 +207,7 @@ int main(int argc, char *argv[])
 			perror("recvfrom");
 			continue;
 		}
-
+      printf("got packet back\n");
 		// validate packet's length and checksum
 		if (testLength(rBuf) && testChecksum(rBuf)) {
 			valid = 1;
@@ -201,7 +217,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (valid) {
-		// print out the ips
+		printIP(rBuf);
 	} else {
 		perror("UDPClient: Timeout");
 	}
