@@ -31,15 +31,20 @@ void displayBuffer(char *Buffer, int length){
 }
 
 void printIP(char* buf) {
+   printf("inside\n");
    int pointer = 5;
    int numIP = 0;
    int length = (uint16_t) ( ((buf[0] << 8) | (buf[1]))& 0xFF);
    int counter = 1;
    length = length - 5;
    numIP = length / 4;
-   
+   printf("number of IPs: %d\n", numIP);
    while (numIP != 0) {
-      printf("%f: %s.%s.%s.%s\n", counter, buf[pointer], buf[pointer+1], buf[pointer+2], buf[pointer+3]);
+      printf("%d: ", counter);
+      printf("%s.", buf[pointer]);
+      printf("%s.", buf[pointer+1]);
+      printf("%s.", buf[pointer+2]);
+      printf("%s\n", buf[pointer+3]);
       counter++;
       numIP--;
       pointer = pointer +4;
@@ -106,10 +111,10 @@ int testChecksum(char* buf) {
    }
 
 	checksum = ~checksum & 0x000000FF;
+   uint8_t claimed= buf[2];
+   printf("claimed checksum: %d, actual: %d\n", claimed, checksum);
    
-   printf("claimed checksum: %d, actual: %d\n", buf[2], checksum);
-   
-	if (checksum == (buf[2] && 0xFF))
+	if (checksum == claimed)
 		return 1;
 	else
 		return 0;
@@ -241,7 +246,7 @@ int main(int argc, char *argv[])
 	int numAttempts = 0;
 
 	while (!valid && (numAttempts < 7)) {
-		memset(rBuf, 0, MAX_BUF_LEN);
+		
 
 		// send packet
 		if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0,
@@ -265,10 +270,12 @@ int main(int argc, char *argv[])
 			valid = 1;
 		} else {
 			numAttempts++;
+         memset(rBuf, 0, MAX_BUF_LEN);
 		}
 	}
 
 	if (valid) {
+      printf("trying to print\n");
 		printIP(rBuf);
 	} else {
 		printf("UDPClient: Timeout\n");
