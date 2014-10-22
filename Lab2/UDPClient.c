@@ -9,7 +9,26 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#define MAX_BUF_LEN 4098
+#define MAX_BUF_LEN 1028
+
+// From Dr. Biaz's code
+void displayBuffer(char *Buffer, int length){
+   int currentByte, column;
+
+   currentByte = 0;
+   printf("\n>>>>>>>>>>>> Content in hexadecimal <<<<<<<<<<<\n");
+   while (currentByte < length){
+      printf("%3d: ", currentByte);
+      column =0;
+      while ((currentByte < length) && (column < 10)){
+         printf("%2x ",Buffer[currentByte]);
+         column++;
+         currentByte++;
+      }
+      printf("\n");
+   }
+   printf("\n\n");
+}
 
 void printIP(char* buf) {
    int pointer = 5;
@@ -27,19 +46,19 @@ void printIP(char* buf) {
    }
 }
 
-char calcChecksum(char* buf) {
+char calcChecksum(char* buf, int length) {
 	int checksum = 0;
 	int tmp = 0;
 	int i = 0;
-	for (i; i < sizeof(buf); i++) {
+	for (i; i < length; i++) {
 		checksum += buf[i];
 		while (checksum > 255) {
 			tmp = checksum & 0x000000FF;
 			tmp++;
 			checksum = tmp;
-		}
-	}
-
+	      }
+   }
+   
 	checksum = ~checksum & 0x000000FF;
 	return (char)checksum;
 }
@@ -47,14 +66,21 @@ char calcChecksum(char* buf) {
 int testLength(char* buf) {
 	uint16_t claimedLen = (uint16_t) ( ((buf[0] << 8) | (buf[1]))& 0xFF);
 	int actualLen = 0;
-	int i = 0;
-	for (i; i < MAX_BUF_LEN; i++) {
-		actualLen++;
-		if(buf[i] == '\0')
-			break;
+	int i = MAX_BUF_LEN-1;
+   int start = 0;
+	for (i; i >= 0; i--) {
+      if (start)
+		   actualLen++;
+      else if (buf[i] != 0) {
+         start = 1;
+         actualLen++;
+      }
 	}
-
-	return claimedLen == actualLen;
+   printf("claimed: %d, actual: %d\n", claimedLen, actualLen);
+   if (claimedLen == actualLen)
+	   return 1;
+   else
+      return 0;
 }
 
 int testValidResponse(char* buf) {
@@ -68,16 +94,22 @@ int testChecksum(char* buf) {
 	int checksum = 0;
 	int tmp = 0;
 	int i = 0;
-	for (i; i < sizeof(buf); i++) {
-		checksum += buf[i];
-		while (checksum > 255) {
-			tmp = checksum & 0x000000FF;
-			tmp++;
-			checksum = tmp;
-		}
-	}
+	for (i; i < MAX_BUF_LEN; i++) {
+      if (i != 2){
+		   checksum += buf[i];
+		   while (checksum > 255) {
+			   tmp = checksum & 0x000000FF;
+			   tmp++;
+			   checksum = tmp;
+	      }
+      }
+   }
 
-	if (checksum == 0xFF)
+	checksum = ~checksum & 0x000000FF;
+   
+   printf("claimed checksum: %d, actual: %d\n", buf[2], checksum);
+   
+	if (checksum == (buf[2] && 0xFF))
 		return 1;
 	else
 		return 0;
@@ -94,7 +126,7 @@ void packSendData(char* buf, char* tempBuff[], int numHosts, uint8_t gid, uint8_
 	int hostLen;
 	char* host;
 
-	totalLen = 5;
+	totalLen = 6;
 	buf[3] = gid;
 	buf[4] = ID;
 	buf[5] = 0x7E;
@@ -119,16 +151,23 @@ void packSendData(char* buf, char* tempBuff[], int numHosts, uint8_t gid, uint8_
 
 	buf[0] = (totalLen & 0xFF00) >> 8;
 	buf[1] = totalLen & 0x00FF;
-	buf[2] = calcChecksum(buf);
+	buf[2] = calcChecksum(buf, totalLen);
+   
+   printf("checksum: %d\n", buf[2]);
 }
+
+
 
 int main(int argc, char *argv[])
 {
 	int sockfd;
-	struct addrinfo hints, *servinfo, *p;
+	struct sockaddr_in myaddr, remaddr;
+   struct hostent *he;
+   struct in_addr **addr_list;
 	int rv;
 	int numbytes;
 	int portNum;
+   int slen=sizeof(remaddr);
 	uint8_t requestID;
 	uint8_t GID;
 	char buf[MAX_BUF_LEN];
@@ -139,8 +178,43 @@ int main(int argc, char *argv[])
 		fprintf(stderr,"usage: UDPClient ServerName PortNum reqeustID hostname1 hostname2...\n");
 		exit(1);
 	}
-
+   
 	portNum = atoi(argv[2]);
+   if ((he = gethostbyname(argv[1])) == NULL) {  // get the host info
+        herror("gethostbyname");
+        return 0;
+    }
+    addr_list = (struct in_addr **)he->h_addr_list;
+    
+   /* create a socket */
+
+	if ((sockfd=socket(AF_INET, SOCK_DGRAM, 0))==-1)
+		printf("socket created\n");
+
+	/* bind it to all local addresses and pick any port number */
+
+	memset((char *)&myaddr, 0, sizeof(myaddr));
+	myaddr.sin_family = AF_INET;
+	myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	myaddr.sin_port = htons(portNum);
+
+	if (bind(sockfd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0) {
+		perror("bind failed");
+		return 0;
+	}
+   
+   /* now define remaddr, the address to whom we want to send messages */
+	/* For convenience, the host address is expressed as a numeric IP address */
+	/* that we will convert to a binary format via inet_aton */
+   
+	memset((char *) &remaddr, 0, sizeof(remaddr));
+	remaddr.sin_family = AF_INET;
+	remaddr.sin_port = htons(portNum);
+	if (inet_aton(inet_ntoa(*addr_list[0]), &remaddr.sin_addr)==0) {
+		fprintf(stderr, "inet_aton() failed\n");
+		exit(1);
+	}
+
 	GID = (uint8_t) portNum - 10010;
 
 	tmp = atoi(argv[3]);
@@ -158,37 +232,11 @@ int main(int argc, char *argv[])
 		tempBuf[j] = argv[i];
 		j++;
 	}
-
+   memset(buf, 0, MAX_BUF_LEN);
 	packSendData(buf, tempBuf, numHosts, GID, requestID);
 
-
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
-
-	if ((rv = getaddrinfo(argv[1], argv[2], &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-		return 1;
-	}
-
-	// loop through all the results and make a socket
-	for(p = servinfo; p != NULL; p = p->ai_next) {
-		if ((sockfd = socket(p->ai_family, p->ai_socktype,
-				p->ai_protocol)) == -1) {
-			perror("talker: socket");
-			continue;
-		}
-
-		break;
-	}
-
-	if (p == NULL) {
-		fprintf(stderr, "talker: failed to bind socket\n");
-		return 2;
-	}
-
-	freeaddrinfo(servinfo);
-
+   displayBuffer(buf, 1024);
+   
 	int valid = 0;
 	int numAttempts = 0;
 
@@ -197,17 +245,21 @@ int main(int argc, char *argv[])
 
 		// send packet
 		if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0,
-				p->ai_addr, p->ai_addrlen)) == -1) {
+				(struct sockaddr *)&remaddr, slen)) == -1) {
 			perror("UDPClient: sendto");
 			continue;
 		}
-
+      
 		// receive packet
-		if ((numbytes = recv(sockfd, rBuf, MAX_BUF_LEN-1, 0)) == -1) {
-			perror("recvfrom");
-			continue;
-		}
+		
+      if ((numbytes = recvfrom(sockfd, rBuf, MAX_BUF_LEN , 0,
+         (struct sockaddr *)&remaddr, &slen)) ==-1)           {
+         perror("recvfrom");
+         exit(1);
+      }
+      
       printf("got packet back\n");
+      displayBuffer(rBuf, 1024);
 		// validate packet's length and checksum
 		if (testLength(rBuf) && testChecksum(rBuf)) {
 			valid = 1;
@@ -219,7 +271,7 @@ int main(int argc, char *argv[])
 	if (valid) {
 		printIP(rBuf);
 	} else {
-		perror("UDPClient: Timeout");
+		printf("UDPClient: Timeout\n");
 	}
 
 	close(sockfd);

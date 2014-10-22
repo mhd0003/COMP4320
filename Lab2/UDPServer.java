@@ -3,7 +3,7 @@ import java.net.*;
 public class UDPServer {
 	public static void main(String args[]) throws Exception {
 		int portNum;
-		byte[] receiveData = new byte[4098];
+		byte[] receiveData = new byte[1028];
 		byte[] sendData = null;
 		short length;
 		int checksum;
@@ -20,16 +20,14 @@ public class UDPServer {
 		portNum = Integer.parseInt(args[0]);
 		DatagramSocket serverSocket = new DatagramSocket(portNum);
 		while(true) {
-
+         sendData = new byte[1024];
 			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 			serverSocket.receive(receivePacket);
 			InetAddress IPAddress = receivePacket.getAddress();
 			System.out.println("Received packet from " + IPAddress);
-			
 			length = getLength(receiveData);
 			if (!testLength(receiveData, length)){
             System.out.println("bad length");
-            sendData = new byte[5];
 				sendData[0] = 0x01;
 				sendData[1] = 127;
 				sendData[2] = 127;
@@ -42,7 +40,6 @@ public class UDPServer {
             System.out.println("bad checksum");
             GID = getGID(receiveData);
 				requestID = getRequestID(receiveData);
-            sendData = new byte[5];
             sendData[1] = GID;
             sendData[2] = requestID;
             sendData[3] = 0x00;
@@ -56,13 +53,13 @@ public class UDPServer {
 				GID = getGID(receiveData);
 				requestID = getRequestID(receiveData);
 				numipAddresses = getNumIP(receiveData);
+            hostnames = getHostnames(numipAddresses, receiveData, length);
 				length = (short) (5 + numipAddresses * 4);
-				sendData = new byte[length];
 				packLength(sendData, length);
 				sendData[3] = GID;
 				sendData[4] = requestID;
 				
-				hostnames = getHostnames(numipAddresses, receiveData);
+				
 				packIP(sendData, hostnames);
             
             sendData[2] = (byte) (calcChecksum(sendData) & 0xFF);
@@ -110,21 +107,38 @@ public class UDPServer {
 		int sum = 0;
       int tmp;
 		for (int i = 0; i < data.length; i++) {
-			sum += data[i];
-         while (sum > 255){
-            tmp = sum & 0xFF;
-            tmp++;
-            sum = tmp;
+         if (i != 2){
+   			sum += data[i];
+            while (sum > 255){
+               tmp = sum & 0xFF;
+               tmp++;
+               sum = tmp;
+            }
          }
 		}
-		if (sum == 0xFF)
+      sum = ~sum;
+      System.out.println("calculated Checksum: " + sum + " recieved Checksum: " + data[2]);
+		if (sum == data[2])
 			return true;
 		
 		return false; 
 	}
 	
 	public static boolean testLength(byte[] data, short length) {
-		if (data.length == length)
+		int testLength = 0;
+      int i = data.length-1;
+      boolean start = false;
+      for(int j = i; i >= 0; i--) {
+         if(start){
+            testLength++; 
+         }
+         else if (data[i] != 0){
+            start = true;
+            testLength++;
+         }
+      }
+      System.out.println(testLength);
+      if (testLength == length)
 			return true;
 		else 
 			return false;
@@ -140,30 +154,35 @@ public class UDPServer {
 	public static short getNumIP(byte[] data) {
 		short num = 0;
 		for (int i = 0; i < data.length; i++) {
-			if (data[i] == 127)
+			if (data[i] == 126)
 				num++;
 		}
-		return (short) (num - 1);
+		return (short) (num);
 	}
 	
-	public static String[] getHostnames(int num, byte[] data) {
+	public static String[] getHostnames(int num, byte[] data, int length) {
 		String hostname = "";
 		String hostnames[] = new String[num];
 		
 		int counter  = 0;
-		
-		for(int i = 0; i < data.length; i++) {
-			if (data[i] == 127) {
-				counter++;
+      
+		for(int i = 6; i <= length; i++) {
+			if (data[i] == 126 || length == i) {
+				hostnames[counter] = hostname;
+            counter++;
+            hostname = "";
 			}
-			else
-				hostname += (char)data[i];
+			else {
+            hostname += (char)data[i];
+         }
+				
 		}
 		return hostnames;
 	}
 	
 	public static byte[] getIPAddress(String hostname) {
 		try {
+         System.out.println(hostname);
 			return InetAddress.getByName(hostname).getAddress();
 		}
 		catch (UnknownHostException e)
