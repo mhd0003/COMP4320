@@ -12,17 +12,17 @@
 #define MAX_BUF_LEN 1028
 
 //prints out the ips from the buffer
-void printIP(char* buf) {
+void printIP(char* buf, char** args) {
    int pointer = 5;
    int numIP = 0;
    int length = (uint16_t) ( ((buf[0] << 8) | (buf[1]))& 0xFF);
-   int counter = 1;
+   int counter = 0;
    length = length - 5;
    numIP = length / 4;
    
    printf("\n Returned IPs\n");
    while (numIP != 0) {
-      printf("%d: ", counter);
+      printf("%s: ", args[4+counter]);
       printf("%d.%d.%d.%d\n", (uint8_t)buf[pointer], (uint8_t)buf[pointer+1], 
          (uint8_t)buf[pointer+2], (uint8_t)buf[pointer+3]);
       counter++;
@@ -244,7 +244,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (valid) {
-		printIP(rBuf);
+		printIP(rBuf, argv);
 	} else {
 		printf("UDPClient: Timeout\n");
 	}
