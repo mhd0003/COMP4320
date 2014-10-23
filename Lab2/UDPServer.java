@@ -20,6 +20,7 @@ public class UDPServer {
 		portNum = Integer.parseInt(args[0]);
 		DatagramSocket serverSocket = new DatagramSocket(portNum);
 		while(true) {
+         System.out.println("\nWaiting for packet...");
          sendData = new byte[1024];
 			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 			serverSocket.receive(receivePacket);
@@ -27,7 +28,7 @@ public class UDPServer {
 			System.out.println("Received packet from " + IPAddress);
 			length = getLength(receiveData);
 			if (!testLength(receiveData, length)){
-            System.out.println("bad length");
+            System.out.println("UDPServer: bad length");
 				sendData[0] = 0x01;
 				sendData[1] = 127;
 				sendData[2] = 127;
@@ -37,7 +38,7 @@ public class UDPServer {
 				serverSocket.send(sendPacket);
             
          } else if(!testChecksum(receiveData)) {
-            System.out.println("bad checksum");
+            System.out.println("UDPServer: bad checksum");
             GID = getGID(receiveData);
 				requestID = getRequestID(receiveData);
             sendData[1] = GID;
@@ -49,7 +50,7 @@ public class UDPServer {
 				serverSocket.send(sendPacket);
             
          }else {
-            System.out.println("VALID");
+            System.out.println("UDPServer: Valid checksum and length");
 				GID = getGID(receiveData);
 				requestID = getRequestID(receiveData);
 				numipAddresses = getNumIP(receiveData);
@@ -66,26 +67,31 @@ public class UDPServer {
 				DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, portNum);
 				serverSocket.send(sendPacket);
 			}
-         System.out.println("Sent Packet");
+         System.out.println("UDPServer: Sent Packet");
 		}
 	}
 	
+   // returns the length from buffer
 	public static short getLength(byte[] data) {
 		 return (short) ( ((data[0] << 8) | (data[1]))& 0xFF);
 	}
 	
+   // returns the checksum from buffer
 	public static int getChecksum(byte[] data) {
 		 return (int) data[2];
 	}
 	
+   // returns the GID from the buffer
 	public static byte getGID(byte[] data) {
 		 return data[3];
 	}
 	
+   // returns the requestID from the buffer
 	public static byte getRequestID(byte[] data) {
 		 return data[4];
 	}
 	
+   // calculates the checksum from the buffer
    public static int calcChecksum(byte[] data)
    {
       int sum = 0;
@@ -103,6 +109,7 @@ public class UDPServer {
       return sum;
    }
    
+   // recalculates the checksum from the buffer and compares it to the one in the buffer
 	public static boolean testChecksum(byte[] data) {
 		int sum = 0;
       int tmp;
@@ -117,13 +124,13 @@ public class UDPServer {
          }
 		}
       sum = ~sum;
-      System.out.println("calculated Checksum: " + sum + " recieved Checksum: " + data[2]);
-		if (sum == data[2])
+		if (sum == data[2] || (sum & 0x000000FF) == data[2])
 			return true;
 		
 		return false; 
 	}
 	
+   // calculates the length and compares to the buffer values of length
 	public static boolean testLength(byte[] data, short length) {
 		int testLength = 0;
       int i = data.length-1;
@@ -137,13 +144,13 @@ public class UDPServer {
             testLength++;
          }
       }
-      System.out.println(testLength);
       if (testLength == length)
 			return true;
 		else 
 			return false;
 	}
 	
+   // validates both length and checksum
 	public static boolean valid(byte[] data, short length) {
 		if (testLength(data, length) && testChecksum(data))
 			return true;
@@ -151,6 +158,7 @@ public class UDPServer {
 			return false;
 	}
 	
+   // calculates the number of IPs 
 	public static short getNumIP(byte[] data) {
 		short num = 0;
 		for (int i = 0; i < data.length; i++) {
@@ -160,6 +168,7 @@ public class UDPServer {
 		return (short) (num);
 	}
 	
+   // creates the hostnames from the buffer and stores into an array
 	public static String[] getHostnames(int num, byte[] data, int length) {
 		String hostname = "";
 		String hostnames[] = new String[num];
@@ -180,9 +189,9 @@ public class UDPServer {
 		return hostnames;
 	}
 	
+   // Gets the IP from the hostnames
 	public static byte[] getIPAddress(String hostname) {
 		try {
-         System.out.println(hostname);
 			return InetAddress.getByName(hostname).getAddress();
 		}
 		catch (UnknownHostException e)
@@ -196,6 +205,7 @@ public class UDPServer {
 		}
 	}
 	
+   // packs the length into the send buffer
 	public static void packLength(byte[] data, short length) {
 		int tmp = ((length >> 8) & 0x00ff) & 0xFF;
 		data[0] = (byte) tmp;
@@ -203,6 +213,7 @@ public class UDPServer {
 		data[1] = (byte) tmp;
 	}
 	
+   // packs the rest of the data into the buffer
 	public static void packIP(byte[] data, String[] Host) {
 		int p = 5;
 		for (int i = 0;  i < Host.length; i++) {
