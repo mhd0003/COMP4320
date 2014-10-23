@@ -11,47 +11,29 @@
 
 #define MAX_BUF_LEN 1028
 
-// From Dr. Biaz's code
-void displayBuffer(char *Buffer, int length){
-   int currentByte, column;
-
-   currentByte = 0;
-   printf("\n>>>>>>>>>>>> Content in hexadecimal <<<<<<<<<<<\n");
-   while (currentByte < length){
-      printf("%3d: ", currentByte);
-      column =0;
-      while ((currentByte < length) && (column < 10)){
-         printf("%2x ",Buffer[currentByte]);
-         column++;
-         currentByte++;
-      }
-      printf("\n");
-   }
-   printf("\n\n");
-}
-
+//prints out the ips from the buffer
 void printIP(char* buf) {
-   printf("inside\n");
    int pointer = 5;
    int numIP = 0;
    int length = (uint16_t) ( ((buf[0] << 8) | (buf[1]))& 0xFF);
    int counter = 1;
    length = length - 5;
    numIP = length / 4;
-   printf("number of IPs: %d\n", numIP);
+   
+   printf("\n Returned IPs\n");
    while (numIP != 0) {
       printf("%d: ", counter);
-      printf("%s.", buf[pointer]);
-      printf("%s.", buf[pointer+1]);
-      printf("%s.", buf[pointer+2]);
-      printf("%s\n", buf[pointer+3]);
+      printf("%d.%d.%d.%d\n", (uint8_t)buf[pointer], (uint8_t)buf[pointer+1], 
+         (uint8_t)buf[pointer+2], (uint8_t)buf[pointer+3]);
       counter++;
       numIP--;
-      pointer = pointer +4;
+      pointer = pointer + 4;
    }
+   printf("\n");
 }
 
-char calcChecksum(char* buf, int length) {
+//calculates the checksum and stores in an uint8_t
+uint8_t calcChecksum(char* buf, int length) {
 	int checksum = 0;
 	int tmp = 0;
 	int i = 0;
@@ -65,9 +47,10 @@ char calcChecksum(char* buf, int length) {
    }
    
 	checksum = ~checksum & 0x000000FF;
-	return (char)checksum;
+	return (uint8_t)checksum;
 }
 
+// Tests the length by calculating actual length and testing against value in the buffer
 int testLength(char* buf) {
 	uint16_t claimedLen = (uint16_t) ( ((buf[0] << 8) | (buf[1]))& 0xFF);
 	int actualLen = 0;
@@ -81,20 +64,13 @@ int testLength(char* buf) {
          actualLen++;
       }
 	}
-   printf("claimed: %d, actual: %d\n", claimedLen, actualLen);
    if (claimedLen == actualLen)
 	   return 1;
    else
       return 0;
 }
 
-int testValidResponse(char* buf) {
-	if (!buf[3] == 0x00 || !buf[4] == 0x00)
-		return 1;
-	else
-		return 0;
-}
-
+// recalculates the checksum by ignoring the given checksum and compares it
 int testChecksum(char* buf) {
 	int checksum = 0;
 	int tmp = 0;
@@ -112,7 +88,6 @@ int testChecksum(char* buf) {
 
 	checksum = ~checksum & 0x000000FF;
    uint8_t claimed= buf[2];
-   printf("claimed checksum: %d, actual: %d\n", claimed, checksum);
    
 	if (checksum == claimed)
 		return 1;
@@ -125,6 +100,7 @@ int testChecksum(char* buf) {
 // b3 = groupID
 // b4 = reqID
 // b5 = '~' = 0x7E
+// b6-b... = hostnames
 void packSendData(char* buf, char* tempBuff[], int numHosts, uint8_t gid, uint8_t ID) {
 	uint16_t totalLen;
 	uint8_t checksum;
@@ -157,8 +133,6 @@ void packSendData(char* buf, char* tempBuff[], int numHosts, uint8_t gid, uint8_
 	buf[0] = (totalLen & 0xFF00) >> 8;
 	buf[1] = totalLen & 0x00FF;
 	buf[2] = calcChecksum(buf, totalLen);
-   
-   printf("checksum: %d\n", buf[2]);
 }
 
 
@@ -239,12 +213,10 @@ int main(int argc, char *argv[])
 	}
    memset(buf, 0, MAX_BUF_LEN);
 	packSendData(buf, tempBuf, numHosts, GID, requestID);
-
-   displayBuffer(buf, 1024);
    
 	int valid = 0;
 	int numAttempts = 0;
-
+   memset(rBuf, 0, MAX_BUF_LEN);
 	while (!valid && (numAttempts < 7)) {
 		
 
@@ -256,15 +228,12 @@ int main(int argc, char *argv[])
 		}
       
 		// receive packet
-		
       if ((numbytes = recvfrom(sockfd, rBuf, MAX_BUF_LEN , 0,
          (struct sockaddr *)&remaddr, &slen)) ==-1)           {
          perror("recvfrom");
          exit(1);
       }
       
-      printf("got packet back\n");
-      displayBuffer(rBuf, 1024);
 		// validate packet's length and checksum
 		if (testLength(rBuf) && testChecksum(rBuf)) {
 			valid = 1;
@@ -275,7 +244,6 @@ int main(int argc, char *argv[])
 	}
 
 	if (valid) {
-      printf("trying to print\n");
 		printIP(rBuf);
 	} else {
 		printf("UDPClient: Timeout\n");
