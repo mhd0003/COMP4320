@@ -41,7 +41,7 @@ void packSendData(char* buf, int gid, int portNum) {
 	buf[0] = 0x12;
 	buf[1] = 0x34;
 	buf[2] = gid & 0x000000FF;
-   buf[3] = (portNum & 0x0000FF00);
+   buf[3] = (portNum >> 8) & 0x000000FF;
    buf[4] = (portNum & 0x000000FF);
 }
 
@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
     
    memset(buf, 0, MAX_BUF_LEN);
 	packSendData(buf, GID, myPort);
-   
+   displayBuffer(buf, 1028);
    // send packet
    if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0,
 		(struct sockaddr *)&remaddr, slen)) == -1) {
