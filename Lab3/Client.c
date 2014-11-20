@@ -12,6 +12,50 @@
 #define MAX_BUF_LEN 1028
 #define GID 28
 
+int isInvalidMove(char* buf) {
+   int invalid = 0;
+
+   if(buf[3] == 0xFF && buf[4] == 0xFF)
+      invalid = 1;
+   
+   return invalid;
+}
+
+void playTurn(char* buf, int* nim) {
+      int row = 0;
+      int token = 0;
+      
+      printf("\nRow#\t:Number of tokens\n");
+      printf("1\t:%d\n", nim[0]);
+      printf("2\t:%d\n", nim[1]);
+      printf("3\t:%d\n", nim[2]);
+      printf("4\t:%d\n\n", nim[3]);
+      printf("Choose row: ");
+      scanf("%d", &row);
+      printf("Enter amount of token: ");
+      scanf("%d", &token);
+      
+      if(validMove(row, token, nim)) {
+         nim[row-1] = nim[row-1] - token;
+               
+         if((nim[0] + nim[1] + nim[2] + nim[3]) == 1) {
+            printf("\nRow#\t:Number of tokens\n");
+            printf("1\t:%d\n", nim[0]);
+            printf("2\t:%d\n", nim[1]);
+            printf("3\t:%d\n", nim[2]);
+            printf("4\t:%d\n\n", nim[3]);
+            printf("Game Over! You Won!\n");
+            exit(0);
+         }
+      }
+      
+      buf[0] = 0x12;
+      buf[1] = 0x34;
+      buf[2] = (char) GID;
+      buf[3] = (char) row;
+      buf[4] = (char) token;
+}
+
 // returns 1 if the move is valid, else it returns 0
 int setBoard(char* buf, int* nim) {
    int row = (uint8_t) buf[3];
@@ -52,7 +96,7 @@ void getIP(char* buf, char* ip) {
    int ip4 = (uint8_t) buf[6];
    
    sprintf(ip, "%u.%u.%u.%u", ip1, ip2, ip3, ip4);
-   printf("%s",ip);
+   printf("%s\n",ip);
 }
 
 // checks the magic number, returns 1 if it matches else 0
@@ -160,6 +204,15 @@ void packSendData(char* buf, int gid, int portNum) {
    buf[4] = (portNum & 0x000000FF);
 }
 
+void *get_in_addr(struct sockaddr *sa)
+{
+    if (sa->sa_family == AF_INET) {
+        return &(((struct sockaddr_in*)sa)->sin_addr);
+    }
+
+    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
 int main(int argc, char *argv[])
 {
 	int sockfd;
@@ -249,6 +302,8 @@ int main(int argc, char *argv[])
          exit(1);
    }
    
+   close(sockfd);
+   
    if(getClientType(rBuf) == 1)
    {
       listenfd=socket(AF_INET,SOCK_STREAM,0);
@@ -260,7 +315,7 @@ int main(int argc, char *argv[])
       
       bind(listenfd,(struct sockaddr *)&gameServer,sizeof(gameServer));
       
-      listen(listenfd,1);
+      listen(listenfd,1024);
       
       int nim[4] = {1,3,5,7};
       int row = 0;
@@ -275,7 +330,14 @@ int main(int argc, char *argv[])
       
       clilen = sizeof(clientAddr);
       connfd = accept(listenfd, (struct sockaddr *)&clientAddr, &clilen);
-      printf("connected");
+      printf("Player connected\n");
+      
+      playTurn(buf, nim);    
+              
+      numbytes = send(connfd, buf, MAX_BUF_LEN, 0);
+      if (numbytes < 0)
+         error("ERROR writing to socket");
+
       while(1) {
          
          memset(buf, 0, MAX_BUF_LEN);
@@ -285,7 +347,15 @@ int main(int argc, char *argv[])
          if (numbytes < 0)
       	   error("ERROR reading from socket");
                
-         if(!setBoard(rBuf, nim)){
+         if (isInvalidMove(rBuf)) {
+            playTurn(buf, nim);
+            
+            numbytes = send(connfd, buf, MAX_BUF_LEN, 0);
+            if (numbytes < 0)
+               error("ERROR writing to socket");
+            
+         }
+         else if(!setBoard(rBuf, nim)){
             memset(buf, 0, MAX_BUF_LEN);
                      
             buf[0] = 12;
@@ -294,7 +364,7 @@ int main(int argc, char *argv[])
             buf[3] = 0xFF;
             buf[4] = 0xFF;
                      
-            numbytes = write(connfd, buf, MAX_BUF_LEN);
+            numbytes = send(connfd, buf, MAX_BUF_LEN,0);
       	   if (numbytes < 0)
       	      error("ERROR writing to socket");
          } 
@@ -308,40 +378,10 @@ int main(int argc, char *argv[])
             exit(0);
          }
          else {
-            token = 0;
-            row = 0;
+         
+            playTurn(buf, nim);
             
-            printf("\nRow#\t:Number of tokens\n");
-            printf("1\t:%d\n", nim[0]);
-            printf("2\t:%d\n", nim[1]);
-            printf("3\t:%d\n", nim[2]);
-            printf("4\t:%d\n\n", nim[3]);
-            printf("Choose row: ");
-            scanf("%d", &row);
-            printf("Enter amount of token: ");
-            scanf("%d", &token);
-            
-            buf[0] = 0x12;
-            buf[1] = 0x34;
-            buf[2] = (char) GID;
-            buf[3] = (char) row;
-            buf[4] = (char) token;
-            
-            if(validMove(row, token, nim)) {
-               nim[row-1] = nim[row-1] - token;
-               
-               if((nim[0] + nim[1] + nim[2] + nim[3]) == 1) {
-                  printf("\nRow#\t:Number of tokens\n");
-                  printf("1\t:%d\n", nim[0]);
-                  printf("2\t:%d\n", nim[1]);
-                  printf("3\t:%d\n", nim[2]);
-                  printf("4\t:%d\n\n", nim[3]);
-                  printf("Game Over! You Won!\n");
-                  exit(0);
-               }
-            }
-            
-            numbytes = write(connfd, buf, MAX_BUF_LEN);
+            numbytes = send(connfd, buf, MAX_BUF_LEN,0);
       	   if (numbytes < 0)
       	      error("ERROR writing to socket");
          }
@@ -356,42 +396,17 @@ int main(int argc, char *argv[])
       
       bzero(&gameServer,sizeof(gameServer));
       gameServer.sin_family = AF_INET;
-      gameServer.sin_addr.s_addr=inet_addr(ip);
+      printf("Attempting to put ip into gameServer\n");
+      inet_pton(AF_INET, ip, &(gameServer.sin_addr));
+      printf("Set ip\n");
       gameServer.sin_port=htons(myPort);
       
+      printf("trying to connect\n");
       connect(listenfd, (struct sockaddr *)&gameServer, sizeof(gameServer));
-      
+      printf("connected\n");
       int nim[4] = {1,3,5,7};
-      int row = 0;
-      int token = 0;
       
-      printf("\nRow#\t:Number of tokens\n");
-      printf("1\t:%d\n", nim[0]);
-      printf("2\t:%d\n", nim[1]);
-      printf("3\t:%d\n", nim[2]);
-      printf("4\t:%d\n\n", nim[3]);
-      printf("Choose row: ");
-      scanf("%d", &row);
-      printf("Enter amount of token: ");
-      scanf("%d", &token);
-      
-      if(validMove(row, token, nim)) {
-         nim[row-1] = nim[row-1] - token;
-      }
-      
-      buf[0] = 0x12;
-      buf[1] = 0x34;
-      buf[2] = (char) GID;
-      buf[3] = (char) row;
-      buf[4] = (char) token;
-      printf("sending packet"); 
-      numbytes = write(connfd, buf, MAX_BUF_LEN);
-      if (numbytes < 0)
-         error("ERROR writing to socket");
-      printf("sent"); 
       while(1) {
-         token = 0;
-         row = 0;
          
          memset(buf, 0, MAX_BUF_LEN);
          memset(rBuf, 0, MAX_BUF_LEN);
@@ -400,7 +415,16 @@ int main(int argc, char *argv[])
          if (numbytes < 0)
       	   error("ERROR reading from socket");
                
-         if(!setBoard(rBuf, nim)){
+         if (isInvalidMove(rBuf)) {
+         
+            playTurn(buf, nim);
+            
+            numbytes = send(listenfd, buf, MAX_BUF_LEN,0);
+      	   if (numbytes < 0)
+      	      error("ERROR writing to socket");
+         }
+         else if(!setBoard(rBuf, nim)){
+         
             memset(buf, 0, MAX_BUF_LEN);
                      
             buf[0] = 12;
@@ -409,7 +433,7 @@ int main(int argc, char *argv[])
             buf[3] = 0xFF;
             buf[4] = 0xFF;
                      
-            numbytes = write(listenfd, buf, MAX_BUF_LEN);
+            numbytes = send(listenfd, buf, MAX_BUF_LEN,0);
       	   if (numbytes < 0)
       	      error("ERROR writing to socket");
          } 
@@ -423,39 +447,10 @@ int main(int argc, char *argv[])
             exit(0);
          }
          else {
-            printf("\nRow#\t:Number of tokens\n");
-            printf("1\t:%d\n", nim[0]);
-            printf("2\t:%d\n", nim[1]);
-            printf("3\t:%d\n", nim[2]);
-            printf("4\t:%d\n\n", nim[3]);
-            printf("Choose row: ");
-            scanf("%d", &row);
-            printf("Enter amount of token: ");
-            scanf("%d", &token);
+                        
+            playTurn(buf, nim);   
             
-            buf[0] = 0x12;
-            buf[1] = 0x34;
-            buf[2] = (char) GID;
-            buf[3] = (char) row;
-            buf[4] = (char) token;
-            
-            if(validMove(row, token, nim)) {
-               nim[row-1] = nim[row-1] - token;
-               
-               if((nim[0] + nim[1] + nim[2] + nim[3]) == 1) {
-                  printf("\nRow#\t:Number of tokens\n");
-                  printf("1\t:%d\n", nim[0]);
-                  printf("2\t:%d\n", nim[1]);
-                  printf("3\t:%d\n", nim[2]);
-                  printf("4\t:%d\n\n", nim[3]);
-                  printf("Game Over! You Won!\n");
-                  exit(0);
-               }
-            }
-            
-            
-            
-            numbytes = write(listenfd, buf, MAX_BUF_LEN);
+            numbytes = send(listenfd, buf, MAX_BUF_LEN,0);
       	   if (numbytes < 0)
       	      error("ERROR writing to socket");
          }
