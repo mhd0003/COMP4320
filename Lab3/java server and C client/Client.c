@@ -242,10 +242,6 @@ int main(int argc, char *argv[])
 	serverPort = atoi(argv[2]);
    myPort = atoi(argv[3]);
    
-   if (serverPort != (10010 + (5*GID))) {
-      fprintf(stderr,"Invalid Server Port: Must be equal to %d\n", (10010 + (5*GID)));
-      exit(1);
-   }
    if ((myPort < 10150) ||  (myPort > 10154)) {
       fprintf(stderr,"Invalid Client Port: Must be in the range 10150 to 10154\n");
       exit(1);
@@ -391,7 +387,8 @@ int main(int argc, char *argv[])
    else if(getClientType(rBuf) == 2) 
    {
       getIP(rBuf, ip);
-      
+      myPort = ((int) (rBuf[7] & 0xFF)) << 8;
+      myPort = ((int) (rBuf[8] & 0xFF)) | myPort;
       listenfd=socket(AF_INET,SOCK_STREAM,0);
       
       bzero(&gameServer,sizeof(gameServer));
@@ -402,7 +399,7 @@ int main(int argc, char *argv[])
       gameServer.sin_port=htons(myPort);
       
       printf("trying to connect\n");
-      connect(listenfd, (struct sockaddr *)&gameServer, sizeof(gameServer));
+      connect(listenfd, (struct sockaddr *)&gameServer.sin_addr, sizeof(gameServer));
       printf("connected\n");
       int nim[4] = {1,3,5,7};
       
