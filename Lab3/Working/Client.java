@@ -35,10 +35,10 @@ public class Client {
       sendData[0] = 0x12;
       sendData[1] = 0x34;
       sendData[2] = (byte) GID;
-      sendData[3] = (byte) (myPort >> 8);
-      sendData[4] = (byte) (myPort & 0x000000FF);
+      sendData[3] = (byte) ((myPort >> 8)& 0xFF);
+      sendData[4] = (byte) ((myPort & 0x000000FF) & 0xFF);
       
-      sendPacket = new DatagramPacket(sendData, (int) 1028, addr, serverPort);
+      sendPacket = new DatagramPacket(sendData, (int) 5, addr, serverPort);
       receivePacket = new DatagramPacket(receiveData, receiveData.length);
       
       clientSocket.send(sendPacket);
@@ -48,7 +48,7 @@ public class Client {
       
       if(getClientType(receiveData) == 1) {
          ServerSocket socket = new ServerSocket(myPort);
-         sendData = new byte[1028];
+         sendData = new byte[5];
          
          int[] nim = {1,3,5,7};
          int row = 0;
@@ -70,23 +70,25 @@ public class Client {
          DataOutputStream outToClient = new DataOutputStream(connectionSocket.getOutputStream());
          
          while(true) {
-            receiveData = new byte[1028];
-            sendData = new byte[1028];
+            receiveData = new byte[5];
+            sendData = new byte[5];
             
             inFromClient.read(receiveData);
             myMove = true;
             if (isInvalidMove(receiveData)) {
                playTurn(sendData, nim);
-               outToClient.write(sendData, 0, 1028);
+               outToClient.write(sendData, 0, 5);
                myMove = false;
+               System.out.println("My move was invalid");
             }
             else if(!setBoard(receiveData, nim)) {
+               System.out.println("Their move was invalid");
                sendData[0] = 0x12;
                sendData[1] = 0x34;
                sendData[2] = (byte)GID;
-               sendData[3] = -127;
-               sendData[4] = -127;
-               outToClient.write(sendData, 0, 1028);
+               sendData[3] = -1;
+               sendData[4] = -1;
+               outToClient.write(sendData, 0, 5);
                myMove = false;
             }
             else if ((nim[0] + nim[1] + nim[2] + nim[3]) == 1 && myMove == true) {
@@ -99,8 +101,9 @@ public class Client {
                System.exit(0);
             }
             else {
+               System.out.println("My Turn");
                playTurn(sendData, nim);
-               outToClient.write(sendData, 0, 1028);
+               outToClient.write(sendData, 0, 5);
                myMove = false;
               
             }
@@ -118,7 +121,8 @@ public class Client {
       }
       else if (getClientType(receiveData) == 2)
       {
-         sendData = new byte[1028];
+         sendData = new byte[5];
+         
          myPort = (receiveData[7] & 0xFF) << 8;
          myPort = (receiveData[8] & 0xFF) | myPort;
          System.out.println(myPort);
@@ -132,27 +136,28 @@ public class Client {
          DataOutputStream outToClient = new DataOutputStream(gameClientSocket.getOutputStream());
          
          playTurn(sendData, nim);
-         outToClient.write(sendData, 0, 1028);
+         outToClient.write(sendData, 0, 5);
          
          while(true) {
             myMove = true;
-            receiveData = new byte[1028];
-            sendData = new byte[1028];
+            receiveData = new byte[5];
+            sendData = new byte[5];
             
             inFromClient.read(receiveData);
-            
-            if (isInvalidMove(receiveData)) {
+                        if (isInvalidMove(receiveData)) {
                playTurn(sendData, nim);
-               outToClient.write(sendData, 0, 1028);
+               outToClient.write(sendData, 0, 5);
                myMove = false;
+               System.out.println("My move was invalid");
             }
             else if(!setBoard(receiveData, nim)) {
+               System.out.println("their move was invalid");
                sendData[0] = 0x12;
                sendData[1] = 0x34;
                sendData[2] = (byte)GID;
-               sendData[3] = -127;
-               sendData[4] = -127;
-               outToClient.write(sendData, 0, 1028);
+               sendData[3] = -1;
+               sendData[4] = -1;
+               outToClient.write(sendData, 0, 5);
                myMove = false;
             }
             else if ((nim[0] + nim[1] + nim[2] + nim[3]) == 1 && myMove == true) {
@@ -165,8 +170,9 @@ public class Client {
                System.exit(0);
             }
             else {
+               System.out.println("My Turn");
                playTurn(sendData, nim);
-               outToClient.write(sendData, 0, 1028);
+               outToClient.write(sendData, 0, 5);
                myMove = false;
                
             }
@@ -184,7 +190,7 @@ public class Client {
          }
       }
       else  {
-         getError(receiveData);
+         getError(receiveData, getClientType(receiveData));
          System.exit(1);
       }
    }
@@ -233,29 +239,28 @@ public class Client {
       return length;
 	}
    
-   public static void getError(byte[] data) {
-      int tmp = (data[4] & 0xFF);
-      System.out.println(tmp);
+   public static void getError(byte[] data, int tmp) {
+
       if (tmp == 1)
          System.out.println("No magic number");
-      else if (tmp == 2)
+      else if (tmp == 2){
          System.out.println("Incorrect length");
-      else if (tmp == 4)
+         System.out.println(getLength(data));
+      }else if (tmp == 4)
          System.out.println("Port out of range");
       else 
          System.out.println("Invalid magic number");
    }
    
    public static boolean checkMagic(byte[] data) {
-      boolean invalid = false;
+      
       int tmp = (data[0] & 0xFF);
       tmp = tmp << 8;
       tmp = tmp | (data[1] & 0xFF);
-      
-      if (tmp == 4660)
-         invalid = true;
-         
-      return invalid;
+      if (tmp == 4660){
+         return true;
+      }   
+      return false;
    }
    
    public static boolean setBoard(byte[] data, int[] nim) {
@@ -286,7 +291,7 @@ public class Client {
    public static boolean isInvalidMove(byte[] data) {
       boolean invalid = false;
       
-      if(data[3] == -127 && data[4] == -127)
+      if(data[3] == -1 && data[4] == -1)
          invalid = true;
       
       return invalid;
@@ -299,7 +304,7 @@ public class Client {
          return false;
       }
       
-      if ((nim[row-1] - token) < 0) {
+      if ((tmp[row-1] - token) < 0) {
          return false;
       }
       if (token < 1 ) {
